@@ -42,7 +42,7 @@ exports.store = async (req, res) => {
       return res.status(400).json({ error: "Invalid status" });
     }
 
-    if (typeof sourceData.is_paid !== "string") {
+    if (typeof sourceData.is_paid !== "boolean") {
       return res.status(400).json({ error: "Invalid payment status" });
     }
 
