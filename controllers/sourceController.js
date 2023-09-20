@@ -36,8 +36,7 @@ exports.store = async (req, res) => {
     }
 
     if (
-      typeof sourceData.status !== "string" &&
-      sourceData.status !== "New" /* && other statuses here*/
+      typeof sourceData.status !== "string"    
     ) {
       return res.status(400).json({ error: "Invalid status" });
     }
