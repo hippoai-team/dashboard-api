@@ -200,6 +200,7 @@ exports.update = async (req, res) => {
       new: true,
     });
     if (!source) {
+      console.log('update error', error)
       return res.status(404).json({ error: "Source not found" });
     }
 
@@ -211,6 +212,7 @@ exports.update = async (req, res) => {
     await source.save();
     res.json(source);
   } catch (error) {
+    console.log('update error', error)
     res.status(500).json({ error: "Failed to update source" });
   }
 };
