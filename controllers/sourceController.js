@@ -5,7 +5,7 @@ const Source = require("../models/Source");
 exports.store = async (req, res) => {
   try {
     const sourceData = req.body;
-
+    console.log(sourceData);
     // Validate fields
     if (!sourceData.topic || typeof sourceData.topic !== "string") {
       return res.status(400).json({ error: "Invalid topic" });
@@ -70,9 +70,12 @@ exports.store = async (req, res) => {
     res.status(201).json(source);
   } catch (error) {
     if (error.name === "ValidationError") {
+      console.log('error', error);
       return res.status(400).json({ error: error.message });
     }
+    console.log('error', error);
     res.status(400).json({ error: "Failed to create source" });
+    
   }
 };
 
