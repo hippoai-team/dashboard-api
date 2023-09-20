@@ -206,6 +206,7 @@ exports.show = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
+  console.log('update', req.body, req.params.id)
   try {
     const source = await Source.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
