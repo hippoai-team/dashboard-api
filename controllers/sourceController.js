@@ -231,9 +231,21 @@ exports.update = async (req, res) => {
 
 exports.destroy = async (req, res) => {
   try {
-    await Source.updateOne({ _id: req.params.id }, { isDeleted: true });
+    await Source.updateOne({ _id: req.params.id }, { isDeleted: true, status: 'remove' });
     res.status(200).send('Source soft deleted successfully');
   } catch (error) {
       res.status(500).send('Server error');
   }
+};
+
+exports.process = async (req, res) => {
+  console.log('process', req.body, req.params.id)
+  res.status(200).send('Source processed successfully');
+
+};
+
+exports.processMultiple = async (req, res) => {
+  console.log('processMultiple', req.body)
+  res.status(200).send('Sources processed successfully');
+
 };
