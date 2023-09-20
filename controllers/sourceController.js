@@ -1,78 +1,78 @@
-// controllers/BookController.js
+// controllers/SourceController.js
 
-const Book = require("../models/Book");
+const Source = require("../models/Source");
 
 exports.store = async (req, res) => {
   try {
-    const bookData = req.body;
+    const sourceData = req.body;
 
     // Validate fields
-    if (!bookData.topic || typeof bookData.topic !== "string") {
+    if (!sourceData.topic || typeof sourceData.topic !== "string") {
       return res.status(400).json({ error: "Invalid topic" });
     }
 
-    if (!bookData.category || typeof bookData.category !== "string") {
+    if (!sourceData.category || typeof sourceData.category !== "string") {
       return res.status(400).json({ error: "Invalid category" });
     }
 
-    if (!bookData.subspecialty || typeof bookData.subspecialty !== "string") {
+    if (!sourceData.subspecialty || typeof sourceData.subspecialty !== "string") {
       return res.status(400).json({ error: "Invalid subspecialty" });
     }
 
-    if (!bookData.title || typeof bookData.title !== "string") {
+    if (!sourceData.title || typeof sourceData.title !== "string") {
       return res.status(400).json({ error: "Invalid title" });
     }
 
-    if (!bookData.publisher || typeof bookData.publisher !== "string") {
+    if (!sourceData.publisher || typeof sourceData.publisher !== "string") {
       return res.status(400).json({ error: "Invalid publisher" });
     }
 
-    if (!bookData.source || typeof bookData.source !== "string") {
+    if (!sourceData.source || typeof sourceData.source !== "string") {
       return res.status(400).json({ error: "Invalid source" });
     }
 
-    if (typeof bookData.year !== "string" || !/^\d{4}$/.test(bookData.year)) {
+    if (typeof sourceData.year !== "string" || !/^\d{4}$/.test(sourceData.year)) {
       return res.status(400).json({ error: "Invalid year" });
     }
 
     if (
-      typeof bookData.status !== "string" &&
-      bookData.status !== "New" /* && other statuses here*/
+      typeof sourceData.status !== "string" &&
+      sourceData.status !== "New" /* && other statuses here*/
     ) {
       return res.status(400).json({ error: "Invalid status" });
     }
 
-    if (typeof bookData.is_paid !== "string") {
+    if (typeof sourceData.is_paid !== "string") {
       return res.status(400).json({ error: "Invalid payment status" });
     }
 
-    if (!bookData.load_type || typeof bookData.load_type !== "string") {
+    if (!sourceData.load_type || typeof sourceData.load_type !== "string") {
       return res.status(400).json({ error: "Invalid load type" });
     }
 
     if (
-      !bookData.patient_population ||
-      typeof bookData.patient_population !== "string"
+      !sourceData.patient_population ||
+      typeof sourceData.patient_population !== "string"
     ) {
       return res.status(400).json({ error: "Invalid patient population" });
     }
 
-    if (!bookData.source_type || typeof bookData.source_type !== "string") {
+    if (!sourceData.source_type || typeof sourceData.source_type !== "string") {
       return res.status(400).json({ error: "Invalid source type" });
     }
 
-    // Create a new Book instance and save it
-    const book = new Book(bookData);
-    book.date_added = new Date();
-    book.date_modified = new Date();
-    await book.save();
+    // Create a new Source instance and save it
+    const source = new Source(sourceData);
+    source.date_added = new Date();
+    source.date_modified = new Date();
+    await source.save();
 
-    res.status(201).json(book);
+    res.status(201).json(source);
   } catch (error) {
     if (error.name === "ValidationError") {
       return res.status(400).json({ error: error.message });
     }
-    res.status(400).json({ error: "Failed to create book" });
+    res.status(400).json({ error: "Failed to create source" });
   }
 };
 
@@ -84,7 +84,7 @@ exports.index = async (req, res) => {
     // Calculate the skip value based on the requested page
     const skip = (page - 1) * perPage;
 
-    // Initializing the search query to exclude soft-deleted books
+    // Initializing the search query to exclude soft-deleted sources
     let query = { isDeleted: { $ne: true } };
 
     // Handle text search
@@ -114,9 +114,9 @@ exports.index = async (req, res) => {
     }
 
     // Get distinct source types
-    const allSourceTypes = await Book.distinct("source_type", query); // Exclude soft-deleted books when fetching distinct source types
+    const allSourceTypes = await Source.distinct("source_type", query); // Exclude soft-deleted sources when fetching distinct source types
 
-    // Get the number of books for each type of status based on search or filter
+    // Get the number of sources for each type of status based on search or filter
     const statusTypes = [
       "indexed",
       "failed_index",
@@ -127,25 +127,25 @@ exports.index = async (req, res) => {
     const statusCounts = {};
 
     for (const status of statusTypes) {
-      statusCounts[status] = await Book.countDocuments({ ...query, status });
+      statusCounts[status] = await Source.countDocuments({ ...query, status });
     }
 
     // Find the total number of documents matching the query
-    const totalBooks = await Book.countDocuments(query);
+    const totalSources = await Source.countDocuments(query);
 
-    // Query for books with pagination and sorting
-    const books = await Book.find(query)
+    // Query for sources with pagination and sorting
+    const sources = await Source.find(query)
       .sort({ date_modified: -1 })
       .skip(skip)
       .limit(perPage)
       .exec();
 
     const data = {
-      books,
-      totalBooks,
+      sources,
+      totalSources,
       currentPage: page,
       statusCounts,
-      totalPages: Math.ceil(totalBooks / perPage),
+      totalPages: Math.ceil(totalSources / perPage),
       allSourceTypes,
       sourceTypeFilter,
     };
@@ -153,69 +153,69 @@ exports.index = async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ error: "Failed to fetch books" });
+    res.status(500).json({ error: "Failed to fetch sources" });
   }
 };
 
 exports.deleteMultiple = async (req, res) => {
-  const { bookIds } = req.body;
+  const { sourceIds } = req.body;
 
 
   try {
-    const result = await Book.updateMany(
-      { _id: { $in: bookIds } },
+    const result = await Source.updateMany(
+      { _id: { $in: sourceIds } },
       { $set: { isDeleted: true } }
     );
 
     if (result.nModified > 0) {
-      res.status(200).json({ message: "Selected books soft deleted successfully."});
+      res.status(200).json({ message: "Selected sources soft deleted successfully."});
     } else {
-      res.status(200).json({ message: "No books were modified. They might already be deleted or not found." });
+      res.status(200).json({ message: "No sources were modified. They might already be deleted or not found." });
     }
 
   } catch (error) {
-    res.status(500).json({ error: `Failed to soft delete selected books: ${error.message}` });
+    res.status(500).json({ error: `Failed to soft delete selected sources: ${error.message}` });
   }
 };
 
 
 exports.show = async (req, res) => {
   try {
-    const book = await Book.findById(req.params.id);
-    if (!book) {
-      return res.status(404).json({ error: "Book not found" });
+    const source = await Source.findById(req.params.id);
+    if (!source) {
+      return res.status(404).json({ error: "Source not found" });
     }
-    res.json(book);
+    res.json(source);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch book" });
+    res.status(500).json({ error: "Failed to fetch source" });
   }
 };
 
 exports.update = async (req, res) => {
   try {
-    const book = await Book.findByIdAndUpdate(req.params.id, req.body, {
+    const source = await Source.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
-    if (!book) {
-      return res.status(404).json({ error: "Book not found" });
+    if (!source) {
+      return res.status(404).json({ error: "Source not found" });
     }
 
     // Exclude date_added from the update
-    book.date_added = book.date_added;
+    source.date_added = source.date_added;
 
     // Update the date_modified field to the current date
-    book.date_modified = new Date();
-    await book.save();
-    res.json(book);
+    source.date_modified = new Date();
+    await source.save();
+    res.json(source);
   } catch (error) {
-    res.status(500).json({ error: "Failed to update book" });
+    res.status(500).json({ error: "Failed to update source" });
   }
 };
 
 exports.destroy = async (req, res) => {
   try {
-    await Book.updateOne({ _id: req.params.id }, { isDeleted: true });
-    res.status(200).send('Book soft deleted successfully');
+    await Source.updateOne({ _id: req.params.id }, { isDeleted: true });
+    res.status(200).send('Source soft deleted successfully');
   } catch (error) {
       res.status(500).send('Server error');
   }

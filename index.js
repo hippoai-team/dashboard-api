@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const bookRoutes = require("./api/bookRoutes");
+const sourceRoutes = require("./api/sourceRoutes");
 const authRoutes = require("./api/authRoutes");
 
 
@@ -26,7 +26,7 @@ mongoose.connect(MONGO_URL, {
 
 
 // routes
-app.use('/api/books', bookRoutes);
+app.use('/api/sources', sourceRoutes);
 app.use('/admin', authRoutes);
 
 const PORT = process.env.PORT || 5000;

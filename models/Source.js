@@ -1,7 +1,7 @@
-// models/Book.js
+// models/Source.js
 const mongoose = require('mongoose');
 
-const bookSchema = new mongoose.Schema({
+const sourceSchema = new mongoose.Schema({
   topic: String,
   category: String,
   subspecialty: String,
@@ -25,6 +25,6 @@ const bookSchema = new mongoose.Schema({
   },
 });
 
-const Book = mongoose.model('Book', bookSchema);
+const Source = mongoose.model('Source', sourceSchema);
 
-module.exports = Book;
+module.exports = Source;
