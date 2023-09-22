@@ -15,14 +15,13 @@ const loginController = async (req, res) => {
             })
         }
         // check user
-        const user = await userModel.findOne({ email }).maxTimeMS(15000);
-        if(!user) {
+        const user = await userModel.findOne({ email, permissions: { $in: ['admin'] } }).maxTimeMS(15000);
+        if (!user) {
             return res.status(404).send({
                 success: false,
-                message: 'user not found'
+                message: 'user not found or does not have admin permissions'
             })
         }
-
         const match = await comparePassword(password, user.password);
 
         if(!match) {
