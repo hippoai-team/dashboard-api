@@ -7,15 +7,6 @@ exports.store = async (req, res) => {
     const sourceData = req.body;
     console.log(sourceData);
     // Validate fields
-    if (!sourceData.topic || typeof sourceData.topic !== "string") {
-      console.log('error, invalid topic', sourceData.topic);
-      return res.status(400).json({ error: "Invalid topic" });
-    }
-
-    if (!sourceData.category || typeof sourceData.category !== "string") {
-      console.log('error, invalid category', sourceData.category);
-      return res.status(400).json({ error: "Invalid category" });
-    }
 
     if (!sourceData.subspecialty || typeof sourceData.subspecialty !== "string") {
       console.log('error, invalid subspecialty', sourceData.subspecialty);
@@ -36,7 +27,11 @@ exports.store = async (req, res) => {
       console.log('error, invalid source', sourceData.source);
       return res.status(400).json({ error: "Invalid source" });
     }
-
+    const existingSource = await Source.findOne({ source: sourceData.source });
+    if (existingSource) {
+      console.log('error, source already exists', sourceData.source);
+      return res.status(400).json({ error: "Source already exists" });
+    }
     if (typeof sourceData.year !== "string" || !/^\d{4}$/.test(sourceData.year)) {
       console.log('error, invalid year', sourceData.year);
       return res.status(400).json({ error: "Invalid year" });
@@ -52,19 +47,6 @@ exports.store = async (req, res) => {
     if (typeof sourceData.is_paid !== "boolean") {
       console.log('error, invalid is_paid', sourceData.is_paid);
       return res.status(400).json({ error: "Invalid payment status" });
-    }
-
-    if (!sourceData.load_type || typeof sourceData.load_type !== "string") {
-      console.log('error, invalid load_type', sourceData.load_type);
-      return res.status(400).json({ error: "Invalid load type" });
-    }
-
-    if (
-      !sourceData.patient_population ||
-      typeof sourceData.patient_population !== "string"
-    ) {
-      console.log('error, invalid patient_population', sourceData.patient_population);
-      return res.status(400).json({ error: "Invalid patient population" });
     }
 
     if (!sourceData.source_type || typeof sourceData.source_type !== "string") {
