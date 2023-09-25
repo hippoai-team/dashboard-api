@@ -75,7 +75,7 @@ exports.store = async (req, res) => {
 exports.index = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
-    const perPage = 5;
+    const perPage = 20;
 
     // Calculate the skip value based on the requested page
     const skip = (page - 1) * perPage;
