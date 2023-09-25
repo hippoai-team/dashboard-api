@@ -109,6 +109,11 @@ exports.index = async (req, res) => {
       query.source_type = sourceTypeFilter; // Add the source_type filter to the query object
     }
 
+    const statusFilter = req.query.status || "";
+    if (statusFilter) {
+      query.status = statusFilter; // Add the status filter to the query object
+    }
+
     // Get distinct source types
     const allSourceTypes = await Source.distinct("source_type", query); // Exclude soft-deleted sources when fetching distinct source types
 
