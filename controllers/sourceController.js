@@ -118,7 +118,7 @@ exports.index = async (req, res) => {
       "failed_index",
       "failed_download",
       "failed_load",
-      "New",
+      "new",
     ];
     const statusCounts = {};
 
