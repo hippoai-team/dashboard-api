@@ -14,6 +14,7 @@ const sourceSchema = new mongoose.Schema({
   load_type: String,
   patient_population: String,
   source_type: String,
+  ids: [String],
   isDeleted: { type: Boolean, default: false },
   date_added: {
     type: Date,
