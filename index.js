@@ -7,7 +7,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const sourceRoutes = require("./api/sourceRoutes");
 const authRoutes = require("./api/authRoutes");
-const betaListRoutes = require("./api/betaListRoutes");
+const betaListRoutes = require("./api/betaListRoute");
 
 
 // middlewares
