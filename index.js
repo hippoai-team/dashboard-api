@@ -7,6 +7,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const sourceRoutes = require("./api/sourceRoutes");
 const authRoutes = require("./api/authRoutes");
+const betaListRoutes = require("./api/betaListRoutes");
 
 
 // middlewares
@@ -27,6 +28,7 @@ mongoose.connect(MONGO_URL, {
 
 // routes
 app.use('/api/sources', sourceRoutes);
+app.use('/api/betalist', betaListRoutes)
 app.use('/admin', authRoutes);
 
 const PORT = process.env.PORT || 5000;
