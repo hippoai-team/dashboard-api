@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const SourceController = require('../controllers/sourceController');
+const BetaListController = require('../controllers/betaListController');
 
-router.post('/store', SourceController.store);
-router.get('/', SourceController.index);
-router.delete('/delete-multiple', SourceController.deleteMultiple);
-router.get('/:id', SourceController.show);
-router.put('/edit/:id', SourceController.update);
-router.delete('/destroy/:id', SourceController.destroy);
+router.post('/store', BetaListController.store);
+router.get('/', BetaListController.index);
+router.delete('/delete-multiple', BetaListController.deleteMultiple);
+router.get('/:id', BetaListController.show);
+router.put('/edit/:id', BetaListController.update);
+router.delete('/destroy/:id', BetaListController.destroy);
 
 
 module.exports = router;
