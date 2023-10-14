@@ -280,6 +280,6 @@ exports.emailInviteToUsers = async (req, res) => {
 
     }
 
-    res.status(200).send('Emails sent successfully', success_status_per_email);
+    res.status(200).send(success_status_per_email);
 }
 
