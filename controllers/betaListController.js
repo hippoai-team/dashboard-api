@@ -124,11 +124,11 @@ exports.index = async (req, res) => {
 };
 
 exports.deleteMultiple = async (req, res) => {
-  const { betaUserIds } = req.body.data;
+  const { userIds } = req.body.data;
 
 //remove from db
   try {
-    await BetaUser.deleteMany({ _id: { $in: betaUserIds } });
+    await BetaUser.deleteMany({ _id: { $in: userIds } });
     res.status(200).send('BetaUsers deleted successfully');
 
   } catch (error) {
