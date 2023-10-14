@@ -7,6 +7,7 @@ const betaUserSchema = new mongoose.Schema({
   email: String,
   usage: Number,
   status: String,
+  profession: String,
     date_added: {
         type: Date,
         default: Date.now,

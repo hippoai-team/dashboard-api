@@ -76,7 +76,7 @@ exports.index = async (req, res) => {
     // Get the number of betaUsers for each type of status based on search or filter
     const statusTypes = [
       "signed_up",
-      "never_signed_up",
+      "not_signed_up",
     ];
     const statusCounts = {};
 
