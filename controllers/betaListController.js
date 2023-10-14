@@ -69,7 +69,6 @@ exports.index = async (req, res) => {
     // Get the number of betaUsers for each type of status based on search or filter
     const statusTypes = [
       "signed_up",
-      "logged_in",
       "never_signed_up",
     ];
     const statusCounts = {};
@@ -88,7 +87,7 @@ exports.index = async (req, res) => {
 
     // concat statusCounts and usageStatus  
     Object.assign(statusCounts, usageStatus);
-    
+
 
 
     // Find the total number of documents matching the query
