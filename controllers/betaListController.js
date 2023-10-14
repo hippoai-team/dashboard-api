@@ -224,10 +224,11 @@ exports.emailInviteToUser = async (req, res) => {
 
 exports.emailInviteToUsers = async (req, res) => {
     console.log('emailInviteToUsers', req.body)
-    const { betaUserIds } = req.body.data;
-    console.log('betaUserIds', betaUserIds)
+    const { userIds } = req.body.data;
+    
+    console.log('betaUserIds', userIds)
     //find emails of betaUsers using mongo
-    const betaUsers = await BetaUser.find({ _id: { $in: betaUserIds } });
+    const betaUsers = await BetaUser.find({ _id: { $in: userIds } });
     console.log('betaUsers', betaUsers)
     const emails = betaUsers.map(betaUser => betaUser.email);
     console.log('emails', emails)
