@@ -187,8 +187,7 @@ exports.destroy = async (req, res) => {
 
 exports.emailInviteToUser = async (req, res) => {
     email = req.params.email
-    console.log('email', email)
-    console.log('req.params', req.params)
+    console.log('password',process.env.NODEMAILER_PASS)
     try {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
