@@ -219,10 +219,11 @@ exports.emailInviteToUser = async (req, res) => {
         const result = await transporter.sendMail(mailOptions).then((result) => {
             console.log('Success: Email sent')
             //update user invite_sent field to true
-            const update = BetaUser.updateOne({ email: email }, { invite_sent: true });
         }).catch((error) => {
             console.log(error)
         });
+        const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
+
         res.status(200).send('Email sent successfully to ' + email);
     }
     catch (error) {
@@ -264,13 +265,14 @@ exports.emailInviteToUsers = async (req, res) => {
 
         const result = await transporter.sendMail(mailOptions).then((result) => {
             console.log('Success: Email sent to ' + email)
-            const update = BetaUser.updateOne({ email: email }, { invite_sent: true });
 
         }
         ).catch((error) => {
             console.log(error)
         });
     }
+    const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
+
     res.status(200).send('Emails sent successfully');
 }
 
