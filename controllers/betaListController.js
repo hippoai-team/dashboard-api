@@ -38,7 +38,7 @@ exports.index = async (req, res) => {
     // Calculate the skip value based on the requested page
     const skip = (page - 1) * perPage;
 
-    // Initializing the search query to exclude soft-deleted betaUsers
+    let query = {};
 
     // Handle text search
     const search = req.query.search || "";
@@ -81,8 +81,7 @@ exports.index = async (req, res) => {
 
     // Find the total number of documents matching the query
     const totalBetaUsers = await BetaUser.countDocuments(query);
-    console.log('query', query)
-    console.log('totalBetaUsers', totalBetaUsers)
+
     // Query for betaUsers with pagination and sorting
     const betaUsers = await BetaUser.find(query)
       .sort({ date_modified: -1 })
