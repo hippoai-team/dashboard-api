@@ -17,6 +17,7 @@ app.use(bodyParser.json());
 
 // config
 dotenv.config();
+console.log(process.env.MONGO_URL);
 const MONGO_URL = process.env.MONGO_URL;
 
 // Connect to MongoDB

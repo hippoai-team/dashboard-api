@@ -65,7 +65,6 @@ exports.index = async (req, res) => {
     }
 
     // Get distinct betaUser types
-    const allBetaUserTypes = await BetaUser.distinct("betaUser_type", query); // Exclude soft-deleted betaUsers when fetching distinct betaUser types
 
     // Get the number of betaUsers for each type of status based on search or filter
     const statusTypes = [
@@ -97,8 +96,7 @@ exports.index = async (req, res) => {
       currentPage: page,
       statusCounts,
       totalPages: Math.ceil(totalBetaUsers / perPage),
-      allBetaUserTypes,
-      betaUserTypeFilter,
+
     };
 
     res.json(data);
