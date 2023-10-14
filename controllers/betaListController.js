@@ -7,7 +7,6 @@ const { google } = require('googleapis');
 exports.store = async (req, res) => {
   try {
     const betaUserData = req.body;
-    console.log(betaUserData);
     // Validate fields
 
     if (!betaUserData.email || typeof betaUserData.email !== "string") {
@@ -15,6 +14,11 @@ exports.store = async (req, res) => {
       return res.status(400).json({ error: "Invalid subspecialty" });
     }
 
+    //if exists return already exists error
+    if (await BetaUser.findOne({ email: betaUserData.email })) {
+      console.log('error, user already exists', betaUserData.email);
+      return res.status(400).json({ error: "User already exists" });
+    }
     // Create a new BetaUser instance and save it
     const betaUser = new BetaUser(betaUserData);
     betaUser.date_added = new Date();
@@ -246,7 +250,7 @@ exports.emailInviteToUsers = async (req, res) => {
           pass: process.env.NODEMAILER_PASS
         }
       });
-    
+    success_status_per_email = {};
     //send email to each email
     for (const email of emails) {
         const mailOptions = {
@@ -265,15 +269,17 @@ exports.emailInviteToUsers = async (req, res) => {
 
         const result = await transporter.sendMail(mailOptions).then((result) => {
             console.log('Success: Email sent to ' + email)
+            success_status_per_email[email] = 'success';
 
         }
         ).catch((error) => {
             console.log(error)
+            success_status_per_email[email] = 'error';
         });
         const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
 
     }
 
-    res.status(200).send('Emails sent successfully');
+    res.status(200).send('Emails sent successfully', success_status_per_email);
 }
 
