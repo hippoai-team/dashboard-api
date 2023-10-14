@@ -88,7 +88,8 @@ exports.index = async (req, res) => {
       .skip(skip)
       .limit(perPage)
       .exec();
-
+    console.log('betaUsers', betaUsers);
+    console.log('query', query)
     const data = {
       betaUsers,
       totalBetaUsers,
