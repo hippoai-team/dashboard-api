@@ -9,6 +9,6 @@ router.get('/:id', BetaListController.show);
 router.put('/edit/:id', BetaListController.update);
 router.delete('/destroy/:id', BetaListController.destroy);
 router.post('/emailInviteToUser/:email', BetaListController.emailInviteToUser);
-
+router.post('/emailInviteToUsers', BetaListController.emailInviteToUsers);
 
 module.exports = router;

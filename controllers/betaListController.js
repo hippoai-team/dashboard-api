@@ -201,10 +201,12 @@ exports.emailInviteToUser = async (req, res) => {
         from: "HippoAI <hello@hippoai.ca",
         to: email,
         subject: `You're invited to sign up for HippoAI`,
-        text: `Thank you for your interest in HippoAI,
+        text: `
+        Thank you for your interest in HippoAI!
+
         You've been invited to sign up for HippoAI by Pendium Health. 
         To create your account, click the link below and sign up with this email address.
-        https://hippo.pendium.health/signup
+        https://hippo.pendium.health/sign-up
         `,
         };
     
@@ -220,4 +222,13 @@ exports.emailInviteToUser = async (req, res) => {
     }
 }
 
+exports.emailInviteToUsers = async (req, res) => {
+    const { betaUserIds } = req.body;
+    //grab email field from betaUserIds array
+    emails = BetaUser.find({ _id: { $in: betaUserIds } }).select('email');
+    for (const email of emails) {
+        console.log('email', email)
+    }
+    res.status(200).send('Emails sent successfully to ' + emails);
+}
 
