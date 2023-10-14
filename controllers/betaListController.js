@@ -224,12 +224,10 @@ exports.emailInviteToUser = async (req, res) => {
 
 exports.emailInviteToUsers = async (req, res) => {
     const { betaUserIds } = req.body;
-    //grab email field from betaUserIds array
-    emails = BetaUser.find({ _id: { $in: betaUserIds } }, { email: 1, _id: 0 })
+    //find emails of betaUsers using mongo
+    const betaUsers = await BetaUser.find({ _id: { $in: betaUserIds } });
+    const emails = betaUsers.map(betaUser => betaUser.email);
     console.log('emails', emails)
-    for (const email of emails) {
-        console.log('email', email)
-    }
     res.status(200).send('Emails sent successfully to ' + emails);
 }
 
