@@ -224,7 +224,7 @@ exports.emailInviteToUser = async (req, res) => {
 
 exports.emailInviteToUsers = async (req, res) => {
     console.log('emailInviteToUsers', req.body)
-    const { betaUserIds } = req.body;
+    const { betaUserIds } = req.body.data;
     console.log('betaUserIds', betaUserIds)
     //find emails of betaUsers using mongo
     const betaUsers = await BetaUser.find({ _id: { $in: betaUserIds } });
