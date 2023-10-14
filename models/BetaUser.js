@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 
 const betaUserSchema = new mongoose.Schema({
+    name: String,
   email: String,
   status: String,
     date_added: {

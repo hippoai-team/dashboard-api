@@ -166,8 +166,8 @@ exports.update = async (req, res) => {
 
 exports.destroy = async (req, res) => {
   try {
-    await BetaUser.updateOne({ _id: req.params.id }, { isDeleted: true, status: 'remove' });
-    res.status(200).send('BetaUser soft deleted successfully');
+    await BetaUser.findByIdAndDelete(req.params.id);
+    res.status(200).send('BetaUser deleted successfully');
   } catch (error) {
       res.status(500).send('Server error');
   }
