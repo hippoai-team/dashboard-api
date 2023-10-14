@@ -14,10 +14,10 @@ exports.store = async (req, res) => {
       return res.status(400).json({ error: "Invalid subspecialty" });
     }
 
-    //if exists return already exists error
+    //if email already exists, return error
     if (await BetaUser.findOne({ email: betaUserData.email })) {
-      console.log('error, user already exists', betaUserData.email);
-      return res.status(400).json({ error: "User already exists" });
+      console.log('error, email already exists', betaUserData.email);
+      return res.status(400).json({ error: "Email already exists" });
     }
     // Create a new BetaUser instance and save it
     const betaUser = new BetaUser(betaUserData);
@@ -280,6 +280,6 @@ exports.emailInviteToUsers = async (req, res) => {
 
     }
 
-    res.status(200).send(success_status_per_email);
+    res.status(200).send('Emails sent successfully');
 }
 
