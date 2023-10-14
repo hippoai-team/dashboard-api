@@ -19,6 +19,7 @@ exports.store = async (req, res) => {
     const betaUser = new BetaUser(betaUserData);
     betaUser.date_added = new Date();
     betaUser.usage = 0;
+    betaUser.invite_sent = false;
     await betaUser.save();
 
     res.status(201).json(betaUser);
