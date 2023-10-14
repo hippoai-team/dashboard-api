@@ -270,8 +270,9 @@ exports.emailInviteToUsers = async (req, res) => {
         ).catch((error) => {
             console.log(error)
         });
+        const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
+
     }
-    const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
 
     res.status(200).send('Emails sent successfully');
 }
