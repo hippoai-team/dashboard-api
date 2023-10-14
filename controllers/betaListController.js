@@ -101,8 +101,7 @@ exports.index = async (req, res) => {
       .skip(skip)
       .limit(perPage)
       .exec();
-    console.log('betaUsers', betaUsers);
-    console.log('query', query)
+
     const data = {
       betaUsers,
       totalBetaUsers,
@@ -187,7 +186,7 @@ exports.destroy = async (req, res) => {
 };
 
 exports.emailInviteToUser = async (req, res) => {
-    email = BetaUser.findById(req.params.id).email;
+    email = await BetaUser.findById(req.params.id).email;
     try {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
