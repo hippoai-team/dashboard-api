@@ -124,9 +124,8 @@ exports.index = async (req, res) => {
 };
 
 exports.deleteMultiple = async (req, res) => {
-    console.log('deleteMultiple', req.body)
-  const { userIds } = req.body.data;
-
+    const { userIds } = req.body.data;
+    console.log('userIds', userIds)
 //remove from db
   try {
     await BetaUser.deleteMany({ _id: { $in: userIds } });
