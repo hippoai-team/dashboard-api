@@ -124,7 +124,7 @@ exports.index = async (req, res) => {
 };
 
 exports.deleteMultiple = async (req, res) => {
-    const { userIds } = req.body.data;
+    const { userIds } = req.body;
     console.log('userIds', userIds)
 //remove from db
   try {
