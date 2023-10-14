@@ -225,7 +225,8 @@ exports.emailInviteToUser = async (req, res) => {
 exports.emailInviteToUsers = async (req, res) => {
     const { betaUserIds } = req.body;
     //grab email field from betaUserIds array
-    emails = BetaUser.find({ _id: { $in: betaUserIds } }).select('email');
+    emails = BetaUser.find({ _id: { $in: betaUserIds } }, { email: 1, _id: 0 })
+    console.log('emails', emails)
     for (const email of emails) {
         console.log('email', email)
     }
