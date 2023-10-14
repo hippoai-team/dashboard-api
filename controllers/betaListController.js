@@ -188,6 +188,11 @@ exports.destroy = async (req, res) => {
 
 exports.emailInviteToUser = async (req, res) => {
     email = req.params.email
+    //if user.status = signed_up, return error
+    const user = await BetaUser.findOne({ email: email });
+    if (user.status === 'signed_up') {
+        return res.status(200).send('User already signed up');
+    }
     console.log('password',process.env.NODEMAILER_PASS)
     try {
         const transporter = nodemailer.createTransport({
@@ -229,6 +234,8 @@ exports.emailInviteToUsers = async (req, res) => {
     const { userIds } = req.body.data;
     //find emails of betaUsers using mongo
     const betaUsers = await BetaUser.find({ _id: { $in: userIds } });
+    //remove users with status = signed_up
+    betaUsers.filter(betaUser => betaUser.status !== 'signed_up');
     const emails = betaUsers.map(betaUser => betaUser.email);
     //send email to each email
     const transporter = nodemailer.createTransport({
