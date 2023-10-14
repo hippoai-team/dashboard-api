@@ -1,4 +1,5 @@
 // controllers/SourceController.js
+const axios = require('axios');
 
 const Source = require("../models/Source");
 
@@ -226,7 +227,13 @@ exports.destroy = async (req, res) => {
 };
 
 exports.process = async (req, res) => {
-  console.log('process', req.body, req.params.id)
+  const id = req.params.id;
+  try {
+    const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
+    console.log(response.data);
+  } catch (error) {
+    console.error(error);
+  }
   res.status(200).send('Source processed successfully');
 
 };
