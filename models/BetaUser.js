@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const betaUserSchema = new mongoose.Schema({
     name: String,
   email: String,
-  usage: Integer,
+  usage: Number,
   status: String,
     date_added: {
         type: Date,
