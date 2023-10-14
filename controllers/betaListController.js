@@ -213,7 +213,7 @@ exports.emailInviteToUser = async (req, res) => {
         }).catch((error) => {
             console.log(error)
         });
-        res.status(200).send('Email sent successfully');
+        res.status(200).send('Email sent successfully to ' + email);
     }
     catch (error) {
         res.status(500).send('Server error');
