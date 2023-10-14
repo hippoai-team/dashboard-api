@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const betaUserSchema = new mongoose.Schema({
     name: String,
+    invite_sent: Boolean,
   email: String,
   usage: Number,
   status: String,

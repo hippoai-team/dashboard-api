@@ -212,6 +212,8 @@ exports.emailInviteToUser = async (req, res) => {
     
         const result = await transporter.sendMail(mailOptions).then((result) => {
             console.log('Success: Email sent')
+            //update user invite_sent field to true
+            const update = BetaUser.updateOne({ email: email }, { invite_sent: true });
         }).catch((error) => {
             console.log(error)
         });
@@ -254,6 +256,8 @@ exports.emailInviteToUsers = async (req, res) => {
 
         const result = await transporter.sendMail(mailOptions).then((result) => {
             console.log('Success: Email sent to ' + email)
+            const update = BetaUser.updateOne({ email: email }, { invite_sent: true });
+
         }
         ).catch((error) => {
             console.log(error)
