@@ -198,7 +198,7 @@ exports.emailInviteToUser = async (req, res) => {
           });
         
         const mailOptions = {
-        from: "HippoAI <hello@hippoai.ca",
+        from: "HippoAI <hello@hippoai.ca>",
         to: email,
         subject: `You're invited to sign up for HippoAI`,
         text: `
@@ -223,15 +223,42 @@ exports.emailInviteToUser = async (req, res) => {
 }
 
 exports.emailInviteToUsers = async (req, res) => {
-    console.log('emailInviteToUsers', req.body)
     const { userIds } = req.body.data;
-    
-    console.log('betaUserIds', userIds)
     //find emails of betaUsers using mongo
     const betaUsers = await BetaUser.find({ _id: { $in: userIds } });
-    console.log('betaUsers', betaUsers)
     const emails = betaUsers.map(betaUser => betaUser.email);
-    console.log('emails', emails)
-    res.status(200).send('Emails sent successfully to ' + emails);
+    //send email to each email
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: 'hello@hippoai.ca',
+          pass: process.env.NODEMAILER_PASS
+        }
+      });
+    
+    //send email to each email
+    for (const email of emails) {
+        const mailOptions = {
+            from: "HippoAI <hello@hippoai.ca>",
+            to: email,
+            subject: `You're invited to sign up for HippoAI`,
+            text: `
+            Thank you for your interest in HippoAI!
+    
+            You've been invited to sign up for HippoAI by Pendium Health. 
+            To create your account, click the link below and sign up with this email address.
+            https://hippo.pendium.health/sign-up
+            `
+        };
+            
+
+        const result = await transporter.sendMail(mailOptions).then((result) => {
+            console.log('Success: Email sent to ' + email)
+        }
+        ).catch((error) => {
+            console.log(error)
+        });
+    }
+    res.status(200).send('Emails sent successfully');
 }
 
