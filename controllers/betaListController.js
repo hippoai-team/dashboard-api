@@ -124,20 +124,12 @@ exports.index = async (req, res) => {
 };
 
 exports.deleteMultiple = async (req, res) => {
-  const { betaUserIds } = req.body;
+  const { betaUserIds } = req.body.data;
 
-
+//remove from db
   try {
-    const result = await BetaUser.updateMany(
-      { _id: { $in: betaUserIds } },
-      { $set: { isDeleted: true } }
-    );
-
-    if (result.nModified > 0) {
-      res.status(200).json({ message: "Selected betaUsers soft deleted successfully."});
-    } else {
-      res.status(200).json({ message: "No betaUsers were modified. They might already be deleted or not found." });
-    }
+    await BetaUser.deleteMany({ _id: { $in: betaUserIds } });
+    res.status(200).send('BetaUsers deleted successfully');
 
   } catch (error) {
     res.status(500).json({ error: `Failed to soft delete selected betaUsers: ${error.message}` });
