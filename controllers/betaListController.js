@@ -186,7 +186,9 @@ exports.destroy = async (req, res) => {
 };
 
 exports.emailInviteToUser = async (req, res) => {
-    email = await BetaUser.findById(req.params.id).email;
+    email = req.params.email
+    console.log('email', email)
+    console.log('req.params', req.params)
     try {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
