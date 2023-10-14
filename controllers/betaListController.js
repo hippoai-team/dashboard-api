@@ -1,6 +1,8 @@
 // controllers/BetaUserController.js
 
 const BetaUser = require("../models/BetaUser");
+const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 
 exports.store = async (req, res) => {
   try {
@@ -183,3 +185,39 @@ exports.destroy = async (req, res) => {
       res.status(500).send('Server error');
   }
 };
+
+exports.emailInviteToUser = async (req, res) => {
+    email = BetaUser.findById(req.params.id).email;
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: 'hello@hippoai.ca',
+              pass: process.env.NODEMAILER_PASS
+            }
+          });
+        
+        const mailOptions = {
+        from: "HippoAI <hello@hippoai.ca",
+        to: email,
+        subject: `You're invited to sign up for HippoAI`,
+        text: `Thank you for your interest in HippoAI,
+        You've been invited to sign up for HippoAI by Pendium Health. 
+        To create your account, click the link below and sign up with this email address.
+        https://hippo.pendium.health/signup
+        `,
+        };
+    
+        const result = await transporter.sendMail(mailOptions).then((result) => {
+            console.log('Success: Email sent')
+        }).catch((error) => {
+            console.log(error)
+        });
+        res.status(200).send('Email sent successfully');
+    }
+    catch (error) {
+        res.status(500).send('Server error');
+    }
+}
+
+

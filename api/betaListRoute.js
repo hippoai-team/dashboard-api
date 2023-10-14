@@ -8,6 +8,7 @@ router.delete('/delete-multiple', BetaListController.deleteMultiple);
 router.get('/:id', BetaListController.show);
 router.put('/edit/:id', BetaListController.update);
 router.delete('/destroy/:id', BetaListController.destroy);
+router.post('/emailInviteToUser/:id', BetaListController.emailInviteToUser);
 
 
 module.exports = router;
