@@ -16,6 +16,7 @@ exports.store = async (req, res) => {
     // Create a new BetaUser instance and save it
     const betaUser = new BetaUser(betaUserData);
     betaUser.date_added = new Date();
+    betaUser.usage = 0;
     await betaUser.save();
 
     res.status(201).json(betaUser);
@@ -69,8 +70,6 @@ exports.index = async (req, res) => {
     const statusTypes = [
       "signed_up",
       "logged_in",
-      "used_hippo",
-      "never_used_hippo",
       "never_signed_up",
     ];
     const statusCounts = {};
@@ -78,6 +77,19 @@ exports.index = async (req, res) => {
     for (const status of statusTypes) {
       statusCounts[status] = await BetaUser.countDocuments({ ...query, status });
     }
+
+    const usageStatus = [
+        'used_hippo',
+        'never_used_hippo'
+    ]
+    //query usage fields > 0 and = 0
+    usageStatus['used_hippo'] = await BetaUser.countDocuments({ ...query, usage: { $gt: 0 } });
+    usageStatus['never_used_hippo'] = await BetaUser.countDocuments({ ...query, usage: { $eq: 0 } });
+
+    // concat statusCounts and usageStatus  
+    Object.assign(statusCounts, usageStatus);
+    
+
 
     // Find the total number of documents matching the query
     const totalBetaUsers = await BetaUser.countDocuments(query);
