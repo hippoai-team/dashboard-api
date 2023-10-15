@@ -237,8 +237,7 @@ exports.process = async (req, res) => {
     console.error(error);
   }
   //add source name to the response data
-  response.data.name = name;
-  res.status(200).send({ message: 'Source processed successfully', data: response.data } );
+  res.status(200).send({ message: 'Source processed successfully', data: response.data, name:name} );
 
 };
 
