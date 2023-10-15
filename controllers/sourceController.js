@@ -232,12 +232,14 @@ exports.process = async (req, res) => {
   const name = await Source.findById(id).select('name');
   try {
     const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
-    console.log(response.data);
+    //add source name to the response data
+    response.data.name = name
+    res.status(200).json(response.data);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ error: "Failed to process source" });
   }
   //add source name to the response data
-  res.status(200).send({ message: 'Source processed successfully', data: response.data, name:name} );
 
 };
 
