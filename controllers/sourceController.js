@@ -228,12 +228,16 @@ exports.destroy = async (req, res) => {
 
 exports.process = async (req, res) => {
   const id = req.params.id;
+  //find corresponding source name using id in source collection
+  const name = await Source.findById(id).select('name');
   try {
     const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
     console.log(response.data);
   } catch (error) {
     console.error(error);
   }
+  //add source name to the response data
+  response.data.name = name;
   res.status(200).send({ message: 'Source processed successfully', data: response.data } );
 
 };
