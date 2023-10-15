@@ -228,8 +228,8 @@ exports.destroy = async (req, res) => {
 
 exports.process = async (req, res) => {
   const id = req.params.id;
-  //find corresponding source name using id in source collection
-  const name = await Source.findById(id).select('name');
+  //find corresponding name using id in source collection
+  const name = await Source.findOne({ _id: id }, { name: 1 });
   try {
     const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
     //add source name to the response data
