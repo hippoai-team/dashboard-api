@@ -2,7 +2,7 @@
 const axios = require('axios');
 
 const Source = require("../models/Source");
-
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://3.96.52.9:5000";
 exports.store = async (req, res) => {
   try {
     const sourceData = req.body;
@@ -173,8 +173,8 @@ exports.deleteMultiple = async (req, res) => {
     );
 
     
-    const response = await axios.post('http://54.224.244.15:5000/process_ids', { ids: sourceIds });
-      //add source name to the response data
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids: sourceIds });
+    //add source name to the response data
     console.log(response.data);
     
 
@@ -233,7 +233,7 @@ exports.destroy = async (req, res) => {
 
     await Source.updateOne({ _id: req.params.id }, { status: 'remove' });
     
-    const response = await axios.post('http://54.224.244.15:5000/process_ids', { ids:[id] });
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
     console.log(response.data);
     
     res.status(200).send('Source soft deleted successfully');
@@ -249,7 +249,7 @@ exports.process = async (req, res) => {
   //find corresponding name using id in source collection
   const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
   try {
-    const response = await axios.post('http://54.224.244.15:5000/process_ids', { ids:[id] });
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
     //add source name to the response data
     response.data.title = title.title
     res.status(200).json(response.data);
@@ -266,7 +266,7 @@ exports.processMultiple = async (req, res) => {
   //find corresponding title using ids in source collection
   const titles = await Source.find({ _id: { $in: sourceIds } }, { title: 1, _id: 1 });
   try {
-    const response = await axios.post('http://54.224.244.15:5000/process_ids', { ids: sourceIds });
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids: sourceIds });
     //add source name to the response data
     response.data.titles = titles
     res.status(200).json(response.data);
