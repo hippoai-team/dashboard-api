@@ -229,11 +229,11 @@ exports.destroy = async (req, res) => {
 exports.process = async (req, res) => {
   const id = req.params.id;
   //find corresponding name using id in source collection
-  const name = await Source.findOne({ _id: id }, { name: 1 });
+  const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
   try {
     const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
     //add source name to the response data
-    response.data.name = name
+    response.data.title = title.title
     res.status(200).json(response.data);
   } catch (error) {
     console.error(error);
@@ -244,7 +244,18 @@ exports.process = async (req, res) => {
 };
 
 exports.processMultiple = async (req, res) => {
-  console.log('processMultiple', req.body)
-  res.status(200).send('Sources processed successfully');
+  const { sourceIds } = req.body.data;
+  //find corresponding title using ids in source collection
+  const titles = await Source.find({ _id: { $in: sourceIds } }, { title: 1, _id: 1 });
+  try {
+    const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids: sourceIds });
+    //add source name to the response data
+    response.data.titles = titles
+    res.status(200).json(response.data);
+  }
+  catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to process sources" });
+  }
 
 };

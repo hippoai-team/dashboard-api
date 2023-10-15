@@ -26,6 +26,11 @@ mongoose.connect(MONGO_URL, {
   useUnifiedTopology: true,
 });
 
+//ping mongo deployment
+
+app.get('/', (req, res) => {
+  res.send('Hello, Express World!');
+});
 
 // routes
 app.use('/api/sources', sourceRoutes);
