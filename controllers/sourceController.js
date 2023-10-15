@@ -234,7 +234,7 @@ exports.process = async (req, res) => {
   } catch (error) {
     console.error(error);
   }
-  res.status(200).send('Source processed successfully');
+  res.status(200).send({ message: 'Source processed successfully', data: response.data } );
 
 };
 
