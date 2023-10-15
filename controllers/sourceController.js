@@ -81,8 +81,8 @@ exports.index = async (req, res) => {
     // Calculate the skip value based on the requested page
     const skip = (page - 1) * perPage;
 
-    // Initializing the search query to exclude soft-deleted sources
-    let query = { isDeleted: { $ne: true } };
+    // Initializing the search query to status == 'remove' or 'removed'
+    let query = {}
 
     // Handle text search
     const search = req.query.search || "";
@@ -112,9 +112,10 @@ exports.index = async (req, res) => {
 
     const statusFilter = req.query.status || "";
     if (statusFilter) {
-      query.status = statusFilter; // Add the status filter to the query object
+      if (statusFilter) {
+        query.status = statusFilter; // Add the status filter to the query object
     }
-
+    }
     // Get distinct source types
     const allSourceTypes = await Source.distinct("source_type", query); // Exclude soft-deleted sources when fetching distinct source types
 
@@ -125,6 +126,8 @@ exports.index = async (req, res) => {
       "failed_download",
       "failed_load",
       "new",
+      "remove",
+      "removed"
     ];
     const statusCounts = {};
 
@@ -166,8 +169,14 @@ exports.deleteMultiple = async (req, res) => {
   try {
     const result = await Source.updateMany(
       { _id: { $in: sourceIds } },
-      { $set: { isDeleted: true } }
+      { $set: { status: remove } }
     );
+
+    
+    const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids: sourceIds });
+      //add source name to the response data
+    console.log(response.data);
+    
 
     if (result.nModified > 0) {
       res.status(200).json({ message: "Selected sources soft deleted successfully."});
@@ -219,12 +228,21 @@ exports.update = async (req, res) => {
 
 exports.destroy = async (req, res) => {
   try {
-    await Source.updateOne({ _id: req.params.id }, { isDeleted: true, status: 'remove' });
+    const id = req.params.id; 
+    const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
+
+    await Source.updateOne({ _id: req.params.id }, { status: 'remove' });
+    
+    const response = await axios.post('http://3.85.8.192:5000/process_ids', { ids:[id] });
+    console.log(response.data);
+    
     res.status(200).send('Source soft deleted successfully');
+
   } catch (error) {
       res.status(500).send('Server error');
   }
-};
+  }
+
 
 exports.process = async (req, res) => {
   const id = req.params.id;
