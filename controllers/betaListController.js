@@ -102,7 +102,7 @@ exports.index = async (req, res) => {
 
     // Query for betaUsers with pagination and sorting
     const betaUsers = await BetaUser.find(query)
-      .sort({ date_modified: -1 })
+      .sort({ date_added: -1 })
       .skip(skip)
       .limit(perPage)
       .exec();
