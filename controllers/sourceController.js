@@ -123,11 +123,9 @@ exports.index = async (req, res) => {
     const statusTypes = [
       "indexed",
       "failed_index",
-      "failed_download",
-      "failed_load",
       "new",
       "remove",
-      "removed"
+      "index_deleted"
     ];
     const statusCounts = {};
 
@@ -139,11 +137,7 @@ exports.index = async (req, res) => {
     const totalSources = await Source.countDocuments(query);
 
     // Query for sources with pagination and sorting
-    const sources = await Source.find(query)
-      .sort({ date_modified: -1 })
-      .skip(skip)
-      .limit(perPage)
-      .exec();
+  w
 
     const data = {
       sources,
