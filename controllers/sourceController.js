@@ -137,7 +137,11 @@ exports.index = async (req, res) => {
     const totalSources = await Source.countDocuments(query);
 
     // Query for sources with pagination and sorting
-  w
+    const sources = await Source.find(query)
+      .sort({ date_modified: -1 })
+      .skip(skip)
+      .limit(perPage)
+      .exec();
 
     const data = {
       sources,
