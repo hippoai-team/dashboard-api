@@ -1,5 +1,6 @@
-const BetaUser = require("../models/BetaUser");
 const ChatLog = require("../models/chatLog");
+const BetaUser = require("../models/BetaUser");
+
 const moment = require('moment');
 
 exports.index = async (req, res) => {
@@ -65,14 +66,22 @@ exports.index = async (req, res) => {
     const userFilter = req.query.user || "";
 
     if (userFilter) {
+        if (userFilter==='beta') {
+          const activeBetaUsers = await BetaUser.find({});
+          const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
+          query.email = { $in: activeBetaUsersEmails };
+        } else {
         query.email = userFilter; // Add the status filter to the query object
         }
-    
+      }
 
     const userRatingFilter = req.query.userRatingFilter || "";
         if (userRatingFilter) {
         query.user_rating = { $exists: true };
         }
+
+    //get active beta users from BetaUser model and add to query
+
 
 
   const result = await ChatLog.aggregate([
