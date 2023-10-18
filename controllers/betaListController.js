@@ -68,38 +68,40 @@ exports.index = async (req, res) => {
 
     const statusFilter = req.query.status || "";
     if (statusFilter) {
-      query.status = statusFilter; // Add the status filter to the query object
+      if (statusFilter === 'signed_up' || statusFilter === 'not_signed_up') {
+        query.status = statusFilter; // Add the status filter to the query object
+        console.log('statusFilter', statusFilter)
+        console.log('query', query)
+      } else if (statusFilter === 'used' || statusFilter === 'not_used') {
+        const usageFilter = statusFilter === 'used' ? { $gt: 0 } : { $eq: 0 };
+        query.usage = usageFilter;
+        console.log('usageFilter', usageFilter)
+        console.log('query', query)
+      }
     }
-
     // Get distinct betaUser types
 
     // Get the number of betaUsers for each type of status based on search or filter
-    const statusTypes = [
-      "signed_up",
-      "not_signed_up",
-    ];
-    const statusCounts = {};
-
-    for (const status of statusTypes) {
-      statusCounts[status] = await BetaUser.countDocuments({ ...query, status });
-    }
-
-    const usageStatus = [
-        'used_hippo',
-        'never_used_hippo'
-    ]
-    //query usage fields > 0 and = 0
-    usageStatus['used_hippo'] = await BetaUser.countDocuments({ ...query, usage: { $gt: 0 } });
-    usageStatus['never_used_hippo'] = await BetaUser.countDocuments({ ...query, usage: { $eq: 0 } });
-
-    // concat statusCounts and usageStatus  
-    Object.assign(statusCounts, usageStatus);
 
 
+    const statusCounts = {
+      signed_up: 0,
+      not_signed_up: 0,
+      used_hippo: 0,
+      never_used_hippo: 0
+    };
+
+    const signedUpCount = await BetaUser.countDocuments({ ...query, status: 'signed_up' });
+    const notSignedUpCount = await BetaUser.countDocuments({ ...query, status: 'not_signed_up' });
+    const usedHippoCount = await BetaUser.countDocuments({ ...query, usage: { $gt: 0 } });
+    const neverUsedHippoCount = await BetaUser.countDocuments({ ...query, usage: { $eq: 0 } });
+    statusCounts.signed_up = signedUpCount;
+    statusCounts.not_signed_up = notSignedUpCount;
+    statusCounts.used_hippo = usedHippoCount;
+    statusCounts.never_used_hippo = neverUsedHippoCount;
 
     // Find the total number of documents matching the query
     const totalBetaUsers = await BetaUser.countDocuments(query);
-
     // Query for betaUsers with pagination and sorting
     const betaUsers = await BetaUser.find(query)
       .sort({ date_added: -1 })
@@ -184,6 +186,7 @@ exports.destroy = async (req, res) => {
 
 exports.emailInviteToUser = async (req, res) => {
     email = req.params.email
+    console.log('email', email)
     //if user.status = signed_up, return error
     const user = await BetaUser.findOne({ email: email });
     if (user.status === 'signed_up') {
@@ -220,10 +223,11 @@ exports.emailInviteToUser = async (req, res) => {
             console.log(error)
         });
         const update = await BetaUser.updateOne({ email: email }, { invite_sent: true });
-
-        res.status(200).send('Email sent successfully to ' + email);
+        console.log('update', update)
+        res.status(200).send('Email sent successfully');
     }
     catch (error) {
+        console.log('error', error)
         res.status(500).send('Server error');
     }
 }
