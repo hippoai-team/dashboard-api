@@ -133,6 +133,11 @@ exports.index = async (req, res) => {
       statusCounts[status] = await Source.countDocuments({ ...query, status });
     }
 
+    const sourceTypeCounts = {};
+    for (const sourceType of allSourceTypes) {
+      sourceTypeCounts[sourceType] = await Source.countDocuments({ ...query, source_type: sourceType });
+    }
+
     // Find the total number of documents matching the query
     const totalSources = await Source.countDocuments(query);
 
@@ -148,6 +153,7 @@ exports.index = async (req, res) => {
       totalSources,
       currentPage: page,
       statusCounts,
+      sourceTypeCounts,
       totalPages: Math.ceil(totalSources / perPage),
       allSourceTypes,
       sourceTypeFilter,
