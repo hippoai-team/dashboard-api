@@ -9,8 +9,7 @@ const sourceRoutes = require("./api/sourceRoutes");
 const authRoutes = require("./api/authRoutes");
 const betaListRoutes = require("./api/betaListRoute");
 const chatLogRoutes = require("./api/chatLogRoutes");
-
-
+const userRoutes = require("./api/userRoutes");
 // middlewares
 app.use(express.json({ extended: false }));
 app.use(cors());
@@ -37,6 +36,8 @@ app.get('/', (req, res) => {
 app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
 app.use('/api/chatlogs', chatLogRoutes)
+app.use('/api/users', userRoutes)
+
 app.use('/admin', authRoutes);
 
 const PORT = process.env.PORT || 8080;

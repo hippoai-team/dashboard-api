@@ -11,13 +11,69 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  role: {
+  name: {
+    type: String,
+    default: null
+  },
+  profession: {
+    type: String,
+    default: null
+  },
+  newsletter: {
+    type: Boolean,
+    default: null
+  },
+  threads: {
+    type: Array,
+    default: []
+  },
+  sources: {
+    type: Array,
+    default: []
+  },
+  permissions: {
+    type: Array,
+    default: []
+  },
+  signup_date: {
+    type: Date,
+    default: null
+  },
+  num_logins: {
     type: Number,
     default: 0
   },
   status: {
     type: String,
     default: 'active'
+  },
+  usage: {
+    type: Number,
+    default: 0
+  },
+  feedback_count: {
+    type: Number,
+    default: 0
+  },
+  follow_up_usage: {
+    type: Number,
+    default: 0
+  },
+  clicked_sources: {
+    type: Array,
+    default: []
+  },
+  sourceClickCount: {
+    type: Number,
+    default: 0
+  },
+  nav_threads: {
+    type: Number,
+    default: 0
+  },
+  nav_saved_sources: {
+    type: Number,
+    default: 0
   },
 });
 
