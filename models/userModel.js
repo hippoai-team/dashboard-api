@@ -14,7 +14,11 @@ const userSchema = new mongoose.Schema({
   role: {
     type: Number,
     default: 0
-  }
+  },
+  status: {
+    type: String,
+    default: 'active'
+  },
 });
 
 module.exports = mongoose.model('users', userSchema);

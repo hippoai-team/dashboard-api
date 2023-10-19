@@ -3,7 +3,7 @@
 const BetaUser = require("../models/BetaUser");
 const nodemailer = require('nodemailer');
 const { google } = require('googleapis');
-
+const User = require("../models/userModel");
 exports.store = async (req, res) => {
   try {
     const betaUserData = req.body;
@@ -19,6 +19,12 @@ exports.store = async (req, res) => {
       console.log('error, email already exists', betaUserData.email);
       return res.status(400).json({ error: "Email already exists" });
     }
+
+    // check if betauser already in user collection
+    const user = await User.findOne({ email: betaUserData.email });
+    if (user) {
+      betaUserData.status = 'signed_up';
+    } 
     // Create a new BetaUser instance and save it
     const betaUser = new BetaUser(betaUserData);
     betaUser.date_added = new Date();
@@ -110,7 +116,7 @@ exports.index = async (req, res) => {
     if (cohortFilter) {
       query.cohort = cohortFilter; // Add the status filter to the query object
     }
-    
+
     const betaUsers = await BetaUser.find(query)
       .sort({ date_added: -1 })
       .skip(skip)
