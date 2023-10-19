@@ -8,7 +8,6 @@ exports.index = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
         const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-        console.log('req',req.query)
         // Calculate the skip value based on the requested page
         const skip = (page - 1) * perPage;
     
@@ -61,7 +60,7 @@ exports.index = async (req, res) => {
         }
     
     const totalUsers = await User.countDocuments(query); // Count the total number of users
-    const chatLogs = await ChatLog.find({}, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
+    const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
     const dailyActiveUsers = {};
     chatLogs.forEach(log => {
         if (!dailyActiveUsers[log.datetime]) {
@@ -87,10 +86,15 @@ exports.index = async (req, res) => {
 
 
     //preset range filter
-    const presetRangeFilter = req.query.presetRangeFilter || "";
+    const presetRangeFilter = req.query.presetRangeFilter || "last_month";
 
-   const { churnData } = await calculateChurn(presetRangeFilter, User, ChatLog, BetaUser, req.query.userCohort);
-    const { queriesByUserAndWeek, weekOverWeekChanges } = await calculateUserTurnoverRate(req.query.userCohort, BetaUser, ChatLog);
+   const { totalChurnRate, churnPerWeek } = await calculateChurn(presetRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
+    const churnData = {
+        totalChurnRate,
+        churnPerWeek
+    };
+    console.log(churnData);
+    const { queriesByUserAndWeek, weekOverWeekChanges } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
 
     const users = await User.aggregate([
@@ -189,26 +193,30 @@ exports.deleteMultiple = async (req, res) => {
 
 // Function to calculate churn rate
 async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
-    const cohortFilter = userCohort ? { cohort: userCohort } : {};
+    console.log('userCohort', userCohort)
+    const cohortFilter = ['all', 'beta'].includes(userCohort) ? {} : { cohort: userCohort };
     const betaUsers = await Beta.find(cohortFilter).distinct('email');
-    const { activityStartDate, activityEndDate } = setDateRange(activityTimeRange);
+    const { startDate, endDate } = setDateRange(activityTimeRange);
     
     
     // Get users who signed up within the cohort date range
     const usersInRange = await User.find({ 
       status: 'active',
       email: { $in: betaUsers }
-
     }).distinct('email');
+    console.log('usersInRange', usersInRange)
+    console.log('activityStartDate', startDate)
+    console.log('activityEndDate', endDate)
     // Get users from usersInRange who have not chatted within the activity date range
     const inactiveUsers = await User.find({
-      email: { $in: usersInRange, $nin: await Chat.distinct('email', { datetime: { $gte: activityStartDate, $lte: activityEndDate } }) },
+      email: { $in: usersInRange, $nin: await Chat.distinct('email', { datetime: { $gte: startDate, $lte: endDate } }) },
       status: 'active'
     }).countDocuments();
+    console.log('inactiveUsers', inactiveUsers)
     const churnRate = (inactiveUsers / usersInRange.length) * 100;
     // Calculate churn rate per week
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const weeks = (activityEndDate - activityStartDate) / msPerWeek;
+    const weeks = (endDate - startDate) / msPerWeek;
     const churnPerWeek = churnRate / weeks;
     return {
       totalChurnRate: churnRate.toFixed(2) + '%',
