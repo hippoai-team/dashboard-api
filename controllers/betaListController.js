@@ -84,6 +84,7 @@ exports.index = async (req, res) => {
     // Get the number of betaUsers for each type of status based on search or filter
 
 
+
     const statusCounts = {
       signed_up: 0,
       not_signed_up: 0,
@@ -103,6 +104,13 @@ exports.index = async (req, res) => {
     // Find the total number of documents matching the query
     const totalBetaUsers = await BetaUser.countDocuments(query);
     // Query for betaUsers with pagination and sorting
+
+    const cohortFilter = req.query.cohort || "";
+
+    if (cohortFilter) {
+      query.cohort = cohortFilter; // Add the status filter to the query object
+    }
+    
     const betaUsers = await BetaUser.find(query)
       .sort({ date_added: -1 })
       .skip(skip)

@@ -8,6 +8,7 @@ const betaUserSchema = new mongoose.Schema({
   usage: Number,
   status: String,
   profession: String,
+  cohort: String,
     date_added: {
         type: Date,
         default: Date.now,
