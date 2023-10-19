@@ -66,14 +66,30 @@ exports.index = async (req, res) => {
     const userFilter = req.query.user || "";
 
     if (userFilter) {
-        if (userFilter==='beta') {
-          const activeBetaUsers = await BetaUser.find({});
-          const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
-          query.email = { $in: activeBetaUsersEmails };
-        } else {
         query.email = userFilter; // Add the status filter to the query object
         }
+    
+    const userGroupFilter = req.query.userGroup || "";
+
+    if (userGroupFilter) {
+      if (userGroupFilter==='beta') {
+        const activeBetaUsers = await BetaUser.find({});
+        const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
+        query.email = { $in: activeBetaUsersEmails };
       }
+      //if in cohort A-D or None
+      else if (['A','B','C','D','none'].includes(userGroupFilter)) {
+
+        const activeBetaUsers = await BetaUser.find({cohort: userGroupFilter});
+        const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
+        query.email = { $in: activeBetaUsersEmails };
+      }
+      else if (userGroupFilter==='all') {
+        //do nothing
+      }
+      else {
+      }
+        }
 
     const userRatingFilter = req.query.userRatingFilter || "";
         if (userRatingFilter) {
