@@ -59,14 +59,18 @@ exports.index = async (req, res) => {
         query.status = statusFilter; // Add the status filter to the query object
         }
     
+    const dateRangeFilter = req.query.dateRange || "last_month";
     const totalUsers = await User.countDocuments(query); // Count the total number of users
     const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
     const dailyActiveUsers = {};
+    const {startDate, endDate} = setDateRange(dateRangeFilter);
     chatLogs.forEach(log => {
-        if (!dailyActiveUsers[log.datetime]) {
-            dailyActiveUsers[log.datetime] = new Set();
+        if (log.datetime >= startDate && log.datetime <= endDate) {
+            if (!dailyActiveUsers[log.datetime]) {
+                dailyActiveUsers[log.datetime] = new Set();
+            }
+            dailyActiveUsers[log.datetime].add(log.email);
         }
-        dailyActiveUsers[log.datetime].add(log.email);
     });
     for (const datetime in dailyActiveUsers) {
         dailyActiveUsers[datetime] = {count: dailyActiveUsers[datetime].size, users: Array.from(dailyActiveUsers[datetime])};
@@ -102,9 +106,8 @@ exports.index = async (req, res) => {
 
 
     //preset range filter
-    const presetRangeFilter = req.query.presetRangeFilter || "last_month";
 
-   const { totalChurnRate, churnPerWeek } = await calculateChurn(presetRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
+   const { totalChurnRate, churnPerWeek } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
     const churnData = {
         totalChurnRate,
         churnPerWeek
@@ -131,7 +134,7 @@ exports.index = async (req, res) => {
             clicked_sources: 1,
             sourceClickCount:1,
             nav_threads: 1,
-            nav_sources: 1,
+            nav_saved_sources: 1,
             num_logins: 1,
             threadCount: { $size: "$threads" },
             sourcesCount: { $size: "$sources" },
@@ -252,13 +255,18 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
       case 'last_week':
         startDate.setDate(endDate.getDate() - 7);
         break;
+      case 'last_year':
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        break;
+      case 'all_time':
+        startDate = new Date(0);
+        break;
       default:
         startDate.setDate(endDate.getDate() - 7);
     }
     return { startDate, endDate };
   };
  
-
   async function calculateUserTurnoverRate(userCohort, BetaList, Chat) {
     const queriesByUserAndWeek = {};
     const cohortFilter = ['all', 'beta'].includes(userCohort) ? {} : { cohort: userCohort };
