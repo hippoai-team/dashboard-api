@@ -71,6 +71,22 @@ exports.index = async (req, res) => {
     for (const datetime in dailyActiveUsers) {
         dailyActiveUsers[datetime] = {count: dailyActiveUsers[datetime].size, users: Array.from(dailyActiveUsers[datetime])};
     }
+    const weeklyActiveUsers = {}
+
+    
+    for (const datetime in dailyActiveUsers) {
+        const week = moment(datetime).startOf('week').format('YYYY-MM-DD');
+        if (!weeklyActiveUsers[week]) {
+            weeklyActiveUsers[week] = new Set();
+        }
+        dailyActiveUsers[datetime].users.forEach(user => {
+            weeklyActiveUsers[week].add(user);
+        });
+    }
+    for (const week in weeklyActiveUsers) {
+        weeklyActiveUsers[week] = {count: weeklyActiveUsers[week].size, users: Array.from(weeklyActiveUsers[week])};
+    }
+
     //sum usage field from all users in query
     const totalUsage = await User.aggregate([
         { $match: query },
@@ -96,6 +112,7 @@ exports.index = async (req, res) => {
     console.log(churnData);
     const { queriesByUserAndWeek, weekOverWeekChanges } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
+ 
 
     const users = await User.aggregate([
         { $match: query },
@@ -128,6 +145,7 @@ exports.index = async (req, res) => {
         totalUsageCount,
         totalFeedbackCount,
         dailyActiveUsers,
+        weeklyActiveUsers,
         churnData,
         queriesByUserAndWeek,
         weekOverWeekChanges
@@ -241,9 +259,9 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
   };
  
 
-  async function calculateUserTurnoverRate(cohortLabel, BetaList, Chat) {
+  async function calculateUserTurnoverRate(userCohort, BetaList, Chat) {
     const queriesByUserAndWeek = {};
-    const cohortFilter = cohortLabel ? { cohort: cohortLabel } : {};
+    const cohortFilter = ['all', 'beta'].includes(userCohort) ? {} : { cohort: userCohort };
     // Fetch users in the specified cohort
     const cohortUsers = await BetaList.find(cohortFilter).distinct('email');
   
@@ -261,6 +279,7 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
       }
       queriesByUserAndWeek[week][email]++;
     });
+
   
     // Calculate week-over-week changes for each user
     const weekOverWeekChanges = {};
@@ -289,3 +308,29 @@ function getWeekNumber(d) {
   const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   return `${d.getUTCFullYear()}-W${weekNo}`;
 }
+
+function calculateWeekOverWeekChanges(queriesByUserAndWeek){
+const weeks = Object.keys(queriesByUserAndWeek);
+const uniqueUsers = [...new Set(weeks.flatMap(week => Object.keys(queriesByUserAndWeek[week])))];
+
+const weekOverWeekChange = {};
+
+weeks.forEach((week, index) => {
+  if (index === 0) return; // Skip the first week
+  
+  const prevWeek = weeks[index - 1];
+  weekOverWeekChange[week] = {};
+
+  uniqueUsers.forEach(user => {
+    const currentWeekCount = queriesByUserAndWeek[week]?.[user] || 0;
+    const prevWeekCount = queriesByUserAndWeek[prevWeek]?.[user] || 0;
+    weekOverWeekChange[week][user] = currentWeekCount - prevWeekCount;
+  });
+});
+
+return weekOverWeekChange;
+}
+
+
+
+
