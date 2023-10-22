@@ -4,7 +4,6 @@ const BetaUser = require('../models/BetaUser');
 const moment = require('moment');
 
 exports.index = async (req, res) => {
-    console.log('index');
     try {
         const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
         const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
@@ -27,10 +26,7 @@ exports.index = async (req, res) => {
         query.$or = searchQueries;
     }
 
-    const userFilter = req.query.userFilter || "";
-    if (userFilter) {
-        query.email = userFilter; // Add the user filter to the query object
-        }
+    
 
     const userGroupFilter = req.query.userGroupFilter || "";
     if (userGroupFilter) {
@@ -52,6 +48,10 @@ exports.index = async (req, res) => {
         else {
         }
           }
+    const userFilter = req.query.userFilter || "";
+          if (userFilter) {
+              query.email = userFilter; // Add the user filter to the query object
+              }
     
     const statusFilter = req.query.statusFilter || "";
 
@@ -59,7 +59,7 @@ exports.index = async (req, res) => {
         query.status = statusFilter; // Add the status filter to the query object
         }
     
-    const dateRangeFilter = req.query.dateRange || "last_month";
+    const dateRangeFilter = req.query.dateRange || "last_week";
     const totalUsers = await User.countDocuments(query); // Count the total number of users
     const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
     const dailyActiveUsers = {};
@@ -75,7 +75,8 @@ exports.index = async (req, res) => {
     for (const datetime in dailyActiveUsers) {
         dailyActiveUsers[datetime] = {count: dailyActiveUsers[datetime].size, users: Array.from(dailyActiveUsers[datetime])};
     }
-    const weeklyActiveUsers = {}
+    const dailyActiveUsersDescription = `The number of active users per day for cohort:'${req.query.userGroupFilter}' in the ${dateRangeFilter}.`;
+    const weeklyActiveUsers = {};
 
     
     for (const datetime in dailyActiveUsers) {
@@ -90,30 +91,33 @@ exports.index = async (req, res) => {
     for (const week in weeklyActiveUsers) {
         weeklyActiveUsers[week] = {count: weeklyActiveUsers[week].size, users: Array.from(weeklyActiveUsers[week])};
     }
+    const weeklyActiveUsersDescription = `Active users per week and change for previous week for cohort:'${req.query.userGroupFilter}' in the ${dateRangeFilter}.`;
 
     //sum usage field from all users in query
     const totalUsage = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: "$usage" } } }
       ]);
+    const totalUsageDescription = `The total usage for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalUsage[0].total}.`;
     const totalUsageCount = totalUsage.length ? totalUsage[0].total : 0;
 
     const totalFeedback = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: "$feedback_count" } } }
       ]);
+    const totalFeedbackDescription = `The total feedback for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalFeedback[0].total}.`;
     const totalFeedbackCount = totalFeedback.length ? totalFeedback[0].total : 0;
 
 
     //preset range filter
 
-   const { totalChurnRate, churnPerWeek } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
+   const { totalChurnRate, churnPerWeek, churnDescription } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
     const churnData = {
         totalChurnRate,
         churnPerWeek
     };
     console.log(churnData);
-    const { queriesByUserAndWeek, weekOverWeekChanges } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
+    const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
  
 
@@ -128,7 +132,7 @@ exports.index = async (req, res) => {
             email: 1,
             name: 1,
             status: 1,
-            signup_date: 1,
+            signup_date: { $dateToString: { format: "%d/%m/%Y", date: "$signup_date" } },
             usage: 1,
             feedback_count: 1,
             clicked_sources: 1,
@@ -141,7 +145,15 @@ exports.index = async (req, res) => {
           },
         },
       ]);
-      
+    const descriptions = {
+        dailyActiveUsersDescription,
+        weeklyActiveUsersDescription,
+        totalUsageDescription,
+        totalFeedbackDescription,
+        weeklyTurnOverRateDescription,
+        churnDescription
+    };
+
     const data = {
         users,
         totalUsers,
@@ -151,7 +163,8 @@ exports.index = async (req, res) => {
         weeklyActiveUsers,
         churnData,
         queriesByUserAndWeek,
-        weekOverWeekChanges
+        weekOverWeekChanges,
+        descriptions
     };
     res.status(200).json(data);
 
@@ -217,18 +230,14 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     console.log('userCohort', userCohort)
     const cohortFilter = ['all', 'beta'].includes(userCohort) ? {} : { cohort: userCohort };
     const betaUsers = await Beta.find(cohortFilter).distinct('email');
-    const { startDate, endDate } = setDateRange(activityTimeRange);
-    
-    
-    // Get users who signed up within the cohort date range
+
+    // Get users who signed up within the cohort 
     const usersInRange = await User.find({ 
       status: 'active',
       email: { $in: betaUsers }
     }).distinct('email');
-    console.log('usersInRange', usersInRange)
-    console.log('activityStartDate', startDate)
-    console.log('activityEndDate', endDate)
     // Get users from usersInRange who have not chatted within the activity date range
+    const { startDate, endDate } = setDateRange(activityTimeRange);
     const inactiveUsers = await User.find({
       email: { $in: usersInRange, $nin: await Chat.distinct('email', { datetime: { $gte: startDate, $lte: endDate } }) },
       status: 'active'
@@ -241,7 +250,8 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     const churnPerWeek = churnRate / weeks;
     return {
       totalChurnRate: churnRate.toFixed(2) + '%',
-      churnPerWeek: churnPerWeek.toFixed(2) + '%'
+      churnPerWeek: churnPerWeek.toFixed(2) + '%',
+      churnDescription: `${usersInRange.length} beta users from beta list signed from cohort ${userCohort}. Between  ${startDate.toDateString()} and ${endDate.toDateString()}, ${inactiveUsers} users have not chatted in this time period. This is a churn rate of ${churnRate.toFixed(2)}% or ${churnPerWeek.toFixed(2)}% per week.`
     };
   }
   
@@ -305,7 +315,8 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
   
     return {
       queriesByUserAndWeek,
-      weekOverWeekChanges
+      weekOverWeekChanges,
+      weeklyTurnOverRateDescription: `The graph below shows the number of queries per beta user in beta list per week for cohort ${userCohort}. The week over week changes are shown if the user or cohort has been active for more than one week.`
     };
   }
 

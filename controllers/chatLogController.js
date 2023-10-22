@@ -65,9 +65,7 @@ exports.index = async (req, res) => {
     
     const userFilter = req.query.user || "";
 
-    if (userFilter) {
-        query.email = userFilter; // Add the status filter to the query object
-        }
+ 
     
     const userGroupFilter = req.query.userGroup || "";
 
@@ -91,6 +89,15 @@ exports.index = async (req, res) => {
       }
         }
 
+        if (userFilter) {
+          query.email = userFilter; // Add the status filter to the query object
+          }
+
+
+    const totalUserRatingYes = await ChatLog.countDocuments({ user_rating: 'Yes', ...query });
+    const totalUserRatingNo = await ChatLog.countDocuments({ user_rating: 'No', ...query });
+    const totalFeedback = [totalUserRatingYes,totalUserRatingNo];
+  
     const userRatingFilter = req.query.userRatingFilter || "";
         if (userRatingFilter) {
         query.user_rating = { $exists: true };
@@ -139,6 +146,8 @@ exports.index = async (req, res) => {
         currentPage: page,
         dateCountObj,
         users,
+        totalFeedback
+
     };
 
     res.json(data);
