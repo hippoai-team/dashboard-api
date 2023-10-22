@@ -1,0 +1,31 @@
+{
+    "email2": {
+      "subject": "HippoAI Beta Testing Confirmation",
+      "body": "Hello {{name}},\n\nYour HippoAI Beta Testing week is confirmed to take place from {{start_date}}. \n\nWe will send out details closer to this date, including booking for a virtual onboarding Zoom call/demo the week prior. \n\nThank you again for participating. Please reach out at any point. \n\nThe Pendium Health Team\n\n"
+    },
+    "email3": {
+      "subject": "Your Beta Testing Week Starts Next Monday",
+      "body": "Hello ___,\n\nYour Beta Testing week is set ..."
+    },
+    "email4": {
+      "subject": "Beta Tester Demo Session",
+      "body": "Dear beta testers,\n\nYour HippoAI onboarding session ..."
+    },
+    "email5": {
+      "subject": "Post-Demo Email",
+      "body": "Dear __,\n\nThank you for attending the HippoAI Beta Onboarding session..."
+    },
+    "email6": {
+      "subject": "Beta Testing Begins",
+      "body": "Dear __,\n\nYour HippoAI Beta Testing officially begins today!..."
+    },
+    "email7": {
+      "subject": "Beta Testing Continues",
+      "body": "Dear __,\n\nI hope you’ve enjoyed using HippoAI this week..."
+    },
+    "email8": {
+      "subject": "Beta Testing Wraps Up",
+      "body": "Dear __,\n\nThank you for being an active beta tester..."
+    }
+  }
+  

@@ -294,3 +294,54 @@ exports.emailInviteToUsers = async (req, res) => {
     res.status(200).send('Emails sent successfully', success_status_per_email);
 }
 
+exports.emailTemplateToUsers = async (req, res) => {
+    const emailTemplatesJson = require('./utils/emailTemplates.json'); 
+    const cohortDatesJson = require('./utils/cohortDates.json'); 
+    const { users, emailType } = req.body.data;
+    console.log('users', users)
+    console.log('emailType', emailType)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'hello@hippoai.ca',
+        pass: process.env.NODEMAILER_PASS
+      }
+    });
+    success_status_per_email = {};
+
+    for (const user of users) {
+      const cohortDate = cohortDatesJson[user.cohort];
+      const emailTemplate = emailTemplatesJson[emailType];
+      const replacements = {
+        name: user.name,
+        start_date: cohortDate.start_date,
+      };
+      console.log('emailTemplate', emailTemplate.body)
+      const emailBody = replacePlaceholders(emailTemplate.body, replacements);
+      console.log('emailBody', emailBody)
+      const mailOptions = {
+          from: "HippoAI <hello@hippoai.ca>",
+          to: user.email,
+          subject: emailTemplate.subject,
+          text: emailBody
+      };
+          
+
+      const result = await transporter.sendMail(mailOptions).then((result) => {
+          console.log('Success: Email sent to ' + user.email)
+          success_status_per_email[user.email] = 'success';
+
+      }
+      ).catch((error) => {
+          console.log(error)
+          success_status_per_email[email] = 'error';
+      });
+    }
+  }
+
+  const replacePlaceholders = (str, replacements) => {
+    return Object.keys(replacements).reduce((acc, placeholder) => {
+      const regex = new RegExp(`{{${placeholder}}}`, 'g');
+      return acc.replace(regex, replacements[placeholder]);
+    }, str);
+  };

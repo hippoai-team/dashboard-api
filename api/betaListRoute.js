@@ -10,5 +10,5 @@ router.put('/edit/:id', BetaListController.update);
 router.delete('/destroy/:id', BetaListController.destroy);
 router.post('/emailInviteToUser/:email', BetaListController.emailInviteToUser);
 router.post('/emailInviteToUsers', BetaListController.emailInviteToUsers);
-
+router.post('/emailTemplateToUsers', BetaListController.emailTemplateToUsers);
 module.exports = router;
