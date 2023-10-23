@@ -122,7 +122,7 @@ exports.index = async (req, res) => {
  
     const totalSavedSources = await User.aggregate([
         { $match: query },
-        { $group: { _id: null, total: { $sum: { $size: "$saved_sources" } } } }
+        { $group: { _id: null, total: { $sum: { $size: "$sources" } } } }
       ]);
     
     const totalClickedSources = await User.aggregate([
