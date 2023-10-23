@@ -120,7 +120,21 @@ exports.index = async (req, res) => {
     const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
  
+    const totalSavedSources = await User.aggregate([
+        { $match: query },
+        { $group: { _id: null, total: { $sum: { $size: "$saved_sources" } } } }
+      ]);
+    
+    const totalClickedSources = await User.aggregate([
+        { $match: query },
+        { $group: { _id: null, total: { $sum: "$sourceClickCount" } } }
+      ]);
 
+    const followUpCount = await User.aggregate([
+        { $match: query },
+        { $group: { _id: null, total: { $sum: "$follow_up_usage" } } }
+
+    ]);
     const users = await User.aggregate([
         { $match: query },
         { $skip: skip },
@@ -164,7 +178,10 @@ exports.index = async (req, res) => {
         churnData,
         queriesByUserAndWeek,
         weekOverWeekChanges,
-        descriptions
+        descriptions,
+        totalSavedSources,
+        totalClickedSources,
+        followUpCount
     };
     res.status(200).json(data);
 
