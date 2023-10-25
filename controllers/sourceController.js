@@ -2,7 +2,8 @@
 const axios = require('axios');
 
 const Source = require("../models/Source");
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://3.96.166.225:5000";
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://3.96.166.225:5000";
+const PIPELINE_API_URL = "http://127.0.0.1:8080";
 exports.store = async (req, res) => {
   try {
     const sourceData = req.body;
@@ -253,10 +254,10 @@ exports.process = async (req, res) => {
   //find corresponding name using id in source collection
   const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
   try {
-    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
+     axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
     //add source name to the response data
-    response.data.title = title.title
-    res.status(200).json(response.data);
+    
+    res.status(200).json({message : 'Sent source processing request to pipeline'});
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to process source" });

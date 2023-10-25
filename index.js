@@ -32,6 +32,40 @@ app.get('/', (req, res) => {
   res.send('Hello, Express World!');
 });
 
+//status checks for sources processing
+const taskStatus = {};  // In-memory storage for task statuses
+
+app.post('/task/start', (req, res) => {
+  const { task_uuid } = req.body;
+  console.log('task_uuid', task_uuid)
+  taskStatus[task_uuid] = "processing";
+  res.sendStatus(200);
+});
+
+app.post('/task/done', (req, res) => {
+  const { task_uuid, response } = req.body;
+  console.log('task_uuid', task_uuid)
+  console.log('response', response)
+  taskStatus[task_uuid] = { status: "done", response };
+  res.sendStatus(200);
+});
+
+app.get('/status/:task_uuid?', (req, res) => {
+  const { task_uuid } = req.params;
+  if (task_uuid) {
+    if (taskStatus[task_uuid]) {
+      res.json(taskStatus[task_uuid]);
+    } else {
+      res.json({ status: "unknown" });
+    }
+  } else {
+    if (Object.keys(taskStatus).length > 0) {
+      res.json(Object.keys(taskStatus));
+    } else {
+      res.json({ status: "no tasks" });
+    }
+  }
+});
 // routes
 app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
