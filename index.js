@@ -60,12 +60,14 @@ app.get('/status/:task_uuid?', (req, res) => {
     }
   } else {
     if (Object.keys(taskStatus).length > 0) {
-      res.json(Object.keys(taskStatus));
+      res.json(taskStatus);
     } else {
+      console.log('no tasks')
       res.json({ status: "no tasks" });
     }
   }
 });
+
 // routes
 app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
@@ -74,5 +76,5 @@ app.use('/api/users', userRoutes)
 
 app.use('/admin', authRoutes);
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server is running in port ${PORT}`));
