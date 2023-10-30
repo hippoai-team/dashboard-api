@@ -76,7 +76,7 @@ exports.index = async (req, res) => {
         query.email = { $in: activeBetaUsersEmails };
       }
       //if in cohort A-D or None
-      else if (['A','B','C','D','none'].includes(userGroupFilter)) {
+      else if (['A','B','C','D','E','none'].includes(userGroupFilter)) {
 
         const activeBetaUsers = await BetaUser.find({cohort: userGroupFilter});
         const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
