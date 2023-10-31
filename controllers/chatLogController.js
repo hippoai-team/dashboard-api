@@ -99,7 +99,8 @@ exports.index = async (req, res) => {
     const totalFeedback = [totalUserRatingYes,totalUserRatingNo];
   
     const userRatingFilter = req.query.userRatingFilter || "";
-        if (typeof userRatingFilter === 'true') {
+    console.log(userRatingFilter);
+        if (userRatingFilter == 'true') {
             query.user_rating = { $exists: true };
         } else if (typeof userRatingFilter === 'string' && userRatingFilter !== "") {
             query.user_rating = userRatingFilter;
