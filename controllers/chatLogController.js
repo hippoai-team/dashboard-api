@@ -99,8 +99,10 @@ exports.index = async (req, res) => {
     const totalFeedback = [totalUserRatingYes,totalUserRatingNo];
   
     const userRatingFilter = req.query.userRatingFilter || "";
-        if (userRatingFilter) {
-        query.user_rating = { $exists: true };
+        if (typeof userRatingFilter === 'boolean') {
+            query.user_rating = { $exists: userRatingFilter };
+        } else if (typeof userRatingFilter === 'string' && userRatingFilter !== "") {
+            query.user_rating = userRatingFilter;
         }
 
     //get active beta users from BetaUser model and add to query
