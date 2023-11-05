@@ -96,7 +96,7 @@ exports.index = async (req, res) => {
     //sum usage field from all users in query
     const totalUsage = await User.aggregate([
         { $match: query },
-        { $group: { _id: null, total: { $sum: "$usage" } } }
+        { $group: { _id: null, total: { $sum: { $add: ["$usage", "$follow_up_usage"] } } } }
       ]);
     const totalUsageDescription = `The total usage for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalUsage[0].total}.`;
     const totalUsageCount = totalUsage.length ? totalUsage[0].total : 0;
