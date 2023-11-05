@@ -98,6 +98,13 @@ exports.index = async (req, res) => {
       never_used_hippo: 0
     };
 
+    const cohortFilter = req.query.cohort || "";
+
+    if (cohortFilter) {
+      query.cohort = cohortFilter; // Add the status filter to the query object
+    }
+
+
     const signedUpCount = await BetaUser.countDocuments({ ...query, status: 'signed_up' });
     const notSignedUpCount = await BetaUser.countDocuments({ ...query, status: 'not_signed_up' });
     const usedHippoCount = await BetaUser.countDocuments({ ...query, usage: { $gt: 0 } });
@@ -111,12 +118,7 @@ exports.index = async (req, res) => {
     const totalBetaUsers = await BetaUser.countDocuments(query);
     // Query for betaUsers with pagination and sorting
 
-    const cohortFilter = req.query.cohort || "";
-
-    if (cohortFilter) {
-      query.cohort = cohortFilter; // Add the status filter to the query object
-    }
-
+  
     const betaUsers = await BetaUser.find(query)
       .sort({ date_added: -1 })
       .skip(skip)
