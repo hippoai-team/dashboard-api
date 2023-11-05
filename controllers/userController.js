@@ -120,7 +120,7 @@ exports.index = async (req, res) => {
     const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
  
-    /*const totalSavedSources = await User.aggregate([
+    const totalSavedSources = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $cond: { if: { $isArray: "$sources" }, then: { $size: "$sources" }, else: 0 } } } } }
       ]);
@@ -134,11 +134,9 @@ exports.index = async (req, res) => {
         { $match: query },
         { $group: { _id: null, total: { $sum: { $ifNull: ["$follow_up_usage", 0] } } } }
 
-    ]);*/
+    ]);
 
-    const totalSavedSources = 0
-    const totalClickedSources = 0
-    const followUpCount = 0
+  
     const users = await User.aggregate([
         { $match: query },
         { $skip: skip },
