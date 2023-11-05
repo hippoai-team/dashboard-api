@@ -155,6 +155,7 @@ exports.index = async (req, res) => {
             feedback_count: 1,
             clicked_sources: 1,
             sourceClickCount:1,
+            follow_up_usage: 1,
             nav_threads: 1,
             nav_saved_sources: 1,
             num_logins: 1,
