@@ -138,30 +138,75 @@ exports.index = async (req, res) => {
     const totalFollowUpCount = followUpCount.length ? followUpCount[0].total : 0;
 
     const users = await User.aggregate([
-        { $match: query },
-        { $skip: skip },
-        { $limit: perPage },
-        { $sort: { signup_date: -1 } },
-        {
-          $project: {
-            _id: 1, 
-            email: 1,
-            name: 1,
-            status: 1,
-            signup_date: { $dateToString: { format: "%d/%m/%Y", date: "$signup_date" } },
-            usage: 1,
-            feedback_count: 1,
-            clicked_sources: 1,
-            sourceClickCount:1,
-            follow_up_usage: 1,
-            nav_threads: 1,
-            nav_saved_sources: 1,
-            num_logins: 1,
-            threadCount: { $size: "$threads" },
-            sourcesCount: { $size: "$sources" },
+      { $match: query },
+      { $skip: skip },
+      { $limit: perPage },
+      { $sort: { signup_date: -1 } },
+      {
+        $project: {
+          email: 1,
+          name: 1,
+          status: 1,
+          signup_date: { $dateToString: { format: "%d/%m/%Y", date: "$signup_date" } },
+          usage: 1,
+          feedback_count: 1,
+          clicked_sources: 1,
+          sourceClickCount: 1,
+          follow_up_usage: 1,
+          nav_threads: 1,
+          nav_saved_sources: 1,
+          num_logins: 1,
+          threadCount: { $size: "$threads" },
+          sourcesCount: { $size: "$sources" },
+          sources: 1 // Include sources array for further processing
+        }
+      },
+      { $unwind: { path: "$sources", preserveNullAndEmptyArrays: true } },
+      { $group: {
+          _id: { userId: "$_id", sourceType: "$sources.source_type" },
+          count: { $sum: 1 },
+          // Add user document to each group to preserve threadCount and sourcesCount
+          user_doc: { $first: "$$ROOT" }
+      }},
+      { $group: {
+          _id: "$_id.userId",
+          sourceCountType: {
+            $push: {
+              type: "$_id.sourceType",
+              count: "$count"
+            }
           },
-        },
-      ]);
+          // Take the user document from the previous stage to preserve threadCount and sourcesCount
+          user_doc: { $first: "$user_doc" }
+      }},
+      {
+        $replaceRoot: { // Replace the root to clean up the structure
+          newRoot: {
+            $mergeObjects: ["$user_doc", { sourceCountType: "$sourceCountType" }]
+          }
+        }
+      }
+    ]);
+    
+    
+    
+    const savedSourceTypeCounts = {};
+    users.forEach(user => {
+      if (user.sourceCountType) {
+        user.sourceCountType.forEach(sourceTypeCount => {
+          if (sourceTypeCount && sourceTypeCount.type) {
+            if (savedSourceTypeCounts[sourceTypeCount.type]) {
+              savedSourceTypeCounts[sourceTypeCount.type] += sourceTypeCount.count;
+            } else {
+              savedSourceTypeCounts[sourceTypeCount.type] = sourceTypeCount.count;
+            }
+          }
+        });
+      }
+    });
+console.log(savedSourceTypeCounts);
+
+      
     const descriptions = {
         dailyActiveUsersDescription,
         weeklyActiveUsersDescription,
@@ -184,7 +229,9 @@ exports.index = async (req, res) => {
         descriptions,
         totalSavedSources,
         totalClickedSources,
-        totalFollowUpCount
+        totalFollowUpCount,
+        savedSourceTypeCounts
+
     };
     res.status(200).json(data);
 
