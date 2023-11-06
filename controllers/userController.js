@@ -124,7 +124,6 @@ exports.index = async (req, res) => {
         { $match: query },
         { $group: { _id: null, total: { $sum: { $cond: { if: { $isArray: "$sources" }, then: { $size: "$sources" }, else: 0 } } } } }
       ]);
-    console.log('saved sources', totalSavedSources)
     const totalSavedSources = savedSources.length ? savedSources[0].total : 0;
     const clickedSources = await User.aggregate([
         { $match: query },
