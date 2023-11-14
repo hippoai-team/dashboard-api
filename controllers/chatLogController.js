@@ -112,9 +112,10 @@ exports.index = async (req, res) => {
 
   const result = await ChatLog.aggregate([
     { $match: query },
+    { $sort: { datetime: 1 } },
     {
       $group: {
-        _id: "$date",
+        _id: { $dateToString: { format: "%m/%d/%Y", date: "$datetime" } },
         count: { $sum: 1 }
       }
     },
@@ -122,7 +123,7 @@ exports.index = async (req, res) => {
       $sort: { _id: 1 }
     }
   ]);
-
+  console.log('result',result)
   let accumulativeCount = 0;
   const dateCountObj = {};
   for (const item of result) {
