@@ -22,13 +22,13 @@ exports.index = async (req, res) => {
         let dateLimit;
         switch (dateRange) {
           case 'last-week':
-            dateLimit = moment().subtract(7, 'days').toDate();
+            dateLimit = moment().subtract(7, 'days').startOf('day').toDate();
             break;
           case 'last-month':
-            dateLimit = moment().subtract(1, 'months').toDate();
+            dateLimit = moment().subtract(1, 'months').startOf('day').toDate();
             break;
           case 'last-year':
-            dateLimit = moment().subtract(1, 'years').toDate();
+            dateLimit = moment().subtract(1, 'years').startOf('day').toDate();
             break;
           default:
             dateLimit = null;
@@ -60,8 +60,12 @@ exports.index = async (req, res) => {
     const dateFilter = req.query.date || "";
 
     if (dateFilter) {
-        query.date = dateFilter; // Add the status filter to the query object
-        }
+        let startOfDay = new Date(dateFilter);
+        startOfDay.setHours(0,0,0,0);
+        let endOfDay = new Date(dateFilter);
+        endOfDay.setHours(23,59,59,999);
+        query.datetime = { $gte: startOfDay, $lte: endOfDay };
+    }
     
     const userFilter = req.query.user || "";
 
@@ -99,7 +103,6 @@ exports.index = async (req, res) => {
     const totalFeedback = [totalUserRatingYes,totalUserRatingNo];
   
     const userRatingFilter = req.query.userRatingFilter || "";
-    console.log(userRatingFilter);
         if (userRatingFilter == 'true') {
             query.user_rating = { $exists: true };
         } else if (typeof userRatingFilter === 'string' && userRatingFilter !== "") {
@@ -115,7 +118,8 @@ exports.index = async (req, res) => {
     { $sort: { datetime: 1 } },
     {
       $group: {
-        _id: { $dateToString: { format: "%m/%d/%Y", date: "$datetime" } },
+        //_id: { $dateToString: { format: "%m/%d/%Y", date: "$datetime" } },
+        _id: '$date',
         count: { $sum: 1 }
       }
     },
@@ -123,7 +127,9 @@ exports.index = async (req, res) => {
       $sort: { _id: 1 }
     }
   ]);
-  console.log('result',result)
+  result.sort((a, b) => {
+    return new Date(a._id) - new Date(b._id);
+  });
   let accumulativeCount = 0;
   const dateCountObj = {};
   for (const item of result) {

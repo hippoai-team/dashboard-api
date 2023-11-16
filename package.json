@@ -22,6 +22,7 @@
     "googleapis": "^127.0.0",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.29.4",
+    "moment-timezone": "^0.5.43",
     "mongoose": "^7.5.2",
     "nodemailer": "^6.9.6"
   }
