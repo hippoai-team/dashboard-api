@@ -150,13 +150,29 @@ exports.index = async (req, res) => {
     
     const users = await ChatLog.distinct("email", query);
 
+    const totalChats = await ChatLog.countDocuments({ ...query, datetime: { $gte: new Date('2023-11-16') } });
+    const numChatsWithClickedSources = await ChatLog.aggregate([
+        { $match: query },
+        { $match: { datetime: { $gte: new Date('2023-11-16') } } },
+        { $unwind: "$sources" },
+        { $match: { "sources.clicked": true } },
+        { $group: { _id: "$sources.source_type", count: { $sum: 1 } } }
+    ]);
+    const totalClicks = numChatsWithClickedSources.reduce((total, chat) => total + chat.count, 0);
+    numChatsWithClickedSources.forEach(chat => {
+        chat.totalClicksPercentage = (chat.count / totalClicks) * 100;
+        chat.totalChatsPercentage = (chat.count / totalChats) * 100;
+    });
+
+
     const data = {
         chatLogs,
         totalCount,
         currentPage: page,
         dateCountObj,
         users,
-        totalFeedback
+        totalFeedback,
+        numChatsWithClickedSources,
 
     };
 
