@@ -18,7 +18,15 @@ exports.index = async (req, res) => {
       const dateRange = req.query.dateRange || "";
       const dateRangeValues = ['all-time','last-week','last-month','last-year'];
         
-      if (dateRange && dateRangeValues.includes(dateRange)) {
+      const dateRangeStart = req.query.dateRangeStart || "";
+      const dateRangeEnd = req.query.dateRangeEnd || "";
+      
+      if (dateRangeStart && dateRangeEnd) {
+        let startDate = new Date(dateRangeStart);
+        let endDate = new Date(dateRangeEnd);
+        endDate.setDate(endDate.getDate() + 1); // Add one day to the end date
+        query.datetime = { $gte: startDate, $lte: endDate };
+      } else if (dateRange && dateRangeValues.includes(dateRange)) {
         let dateLimit;
         switch (dateRange) {
           case 'last-week':
