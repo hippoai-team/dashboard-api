@@ -63,8 +63,25 @@ exports.index = async (req, res) => {
     const totalUsers = await User.countDocuments(query); // Count the total number of users
     const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
     const dailyActiveUsers = {};
-    const {startDate, endDate} = setDateRange(dateRangeFilter);
-    chatLogs.forEach(log => {
+    const dateRangeStart = req.query.dateRangeStart || "";
+    const dateRangeEnd = req.query.dateRangeEnd || "";
+
+    let dateRangeValues = ['last_week', 'last_month', 'last_year', 'all_time'];
+    let startDate;
+    let endDate;
+    if (dateRangeStart && dateRangeEnd) {
+      startDate = new Date(dateRangeStart);
+      endDate = new Date(dateRangeEnd);
+
+      endDate.setDate(endDate.getDate()); // Add one day to the end date
+    } else if (dateRangeFilter && dateRangeValues.includes(dateRangeFilter)) {
+      let dateRangeResult = setDateRange(dateRangeFilter);
+      startDate = dateRangeResult.startDate;
+      endDate = dateRangeResult.endDate;
+
+    }
+
+      chatLogs.forEach(log => {
         if (log.datetime >= startDate && log.datetime <= endDate) {
             if (!dailyActiveUsers[log.datetime]) {
                 dailyActiveUsers[log.datetime] = new Set();
