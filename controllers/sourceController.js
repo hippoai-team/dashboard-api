@@ -2,7 +2,8 @@
 const axios = require('axios');
 
 const Source = require("../models/Source");
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://3.96.166.225:5000";
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
+//const PIPELINE_API_URL = 'http://127.0.0.1:8080';
 exports.store = async (req, res) => {
   try {
     const sourceData = req.body;
