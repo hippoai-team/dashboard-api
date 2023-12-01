@@ -114,14 +114,14 @@ exports.index = async (req, res) => {
     const totalUsage = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $add: ["$usage", "$follow_up_usage"] } } } }
-      ]);
+      ]).allowDiskUse(true);
     const totalUsageDescription = `The total usage for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalUsage[0].total}.`;
     const totalUsageCount = totalUsage.length ? totalUsage[0].total : 0;
 
     const totalFeedback = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: "$feedback_count" } } }
-      ]);
+      ]).allowDiskUse(true);
     const totalFeedbackDescription = `The total feedback for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalFeedback[0].total}.`;
     const totalFeedbackCount = totalFeedback.length ? totalFeedback[0].total : 0;
 
@@ -140,18 +140,18 @@ exports.index = async (req, res) => {
     const savedSources = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $cond: { if: { $isArray: "$sources" }, then: { $size: "$sources" }, else: 0 } } } } }
-      ]);
+      ]).allowDiskUse(true);
     const totalSavedSources = savedSources.length ? savedSources[0].total : 0;
     const clickedSources = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $ifNull: ["$sourceClickCount", 0] } } } }
-      ]);
+      ]).allowDiskUse(true);
     const totalClickedSources = clickedSources.length ? clickedSources[0].total : 0;
     const followUpCount = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $ifNull: ["$follow_up_usage", 0] } } } }
 
-    ]);
+    ]).allowDiskUse(true);
     const totalFollowUpCount = followUpCount.length ? followUpCount[0].total : 0;
 
     const users = await User.aggregate([
@@ -203,7 +203,7 @@ exports.index = async (req, res) => {
           }
         }
       }
-    ]);
+    ]).allowDiskUse(true);
     
     
     
