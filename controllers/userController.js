@@ -368,7 +368,7 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     const cohortUsers = await BetaList.find(cohortFilter).distinct('email');
   
     // Get chat logs for users in the cohort
-    const chatLogs = await Chat.find({ email: { $in: cohortUsers } }).sort({ datetime: 1 });
+    const chatLogs = await Chat.find({ email: { $in: cohortUsers } }).sort({ datetime: 1 }).allowDiskUse(true);
   
     chatLogs.forEach(chat => {
       const week = getWeekNumber(chat.datetime);
