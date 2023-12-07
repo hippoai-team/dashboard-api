@@ -264,7 +264,7 @@ catch (error) {
 
 exports.show = async (req, res) => {
     try {
-        const user = await User.findById(req.params.id).select('name email status role profession');
+        const user = await User.findById(req.params.id, 'name email status role permissions');
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
