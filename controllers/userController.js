@@ -128,12 +128,12 @@ exports.index = async (req, res) => {
 
     //preset range filter
 
-   const { totalChurnRate, churnPerWeek, churnDescription } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
+   const { totalChurnRate, churnPerWeek, churnDescription,inactiveUsers } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
     const churnData = {
         totalChurnRate,
-        churnPerWeek
+        churnPerWeek,
+        inactiveUsers
     };
-    console.log(churnData);
     const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
  
@@ -325,9 +325,23 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     const inactiveUsers = await User.find({
       email: { $in: usersInRange, $nin: await Chat.distinct('email', { datetime: { $gte: startDate, $lte: endDate } }) },
       status: 'active'
-    }).countDocuments();
-    console.log('inactiveUsers', inactiveUsers)
-    const churnRate = (inactiveUsers / usersInRange.length) * 100;
+    }).distinct('email');
+    //find days since last active for inactive users
+    const lastActiveDates = await Chat.aggregate([
+      { $match: { email: { $in: inactiveUsers } } },
+      { $group: { _id: "$email", lastActiveDate: { $max: "$datetime" } } }
+    ]).allowDiskUse(true);
+    const inactiveUsersWithLastActiveDate = inactiveUsers.map(user => {
+      const lastActiveDate = lastActiveDates.find(lastActiveDate => lastActiveDate._id === user);
+      return {
+        email: user,
+        //calculate number of days since last active
+        daysSinceLastActive: lastActiveDate ? Math.round((endDate - lastActiveDate.lastActiveDate) / (1000 * 60 * 60 * 24)) : null
+      };
+    });
+
+    const numInactiveUsers = inactiveUsers.length;
+    const churnRate = (numInactiveUsers / usersInRange.length) * 100;
     // Calculate churn rate per week
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
     const weeks = (endDate - startDate) / msPerWeek;
@@ -335,7 +349,8 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     return {
       totalChurnRate: churnRate.toFixed(2) + '%',
       churnPerWeek: churnPerWeek.toFixed(2) + '%',
-      churnDescription: `${usersInRange.length} beta users from beta list signed from cohort ${userCohort}. Between  ${startDate.toDateString()} and ${endDate.toDateString()}, ${inactiveUsers} users have not chatted in this time period. This is a churn rate of ${churnRate.toFixed(2)}% or ${churnPerWeek.toFixed(2)}% per week.`
+      churnDescription: `${usersInRange.length} beta users from beta list signed from cohort ${userCohort}. Between  ${startDate.toDateString()} and ${endDate.toDateString()}, ${inactiveUsers} users have not chatted in this time period. This is a churn rate of ${churnRate.toFixed(2)}% or ${churnPerWeek.toFixed(2)}% per week.`,
+      inactiveUsers: inactiveUsersWithLastActiveDate
     };
   }
   
