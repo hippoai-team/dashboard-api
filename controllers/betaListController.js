@@ -213,13 +213,13 @@ exports.emailInviteToUser = async (req, res) => {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-              user: 'hello@hippoai.ca',
+              user: 'hello@pendiumhealth.com',
               pass: process.env.NODEMAILER_PASS
             }
           });
         
         const mailOptions = {
-        from: "HippoAI <hello@hippoai.ca>",
+        from: "Pendium Health - HippoAI <hello@pendiumhealth.com>",
         to: email,
         subject: `You're invited to sign up for HippoAI`,
         text: `
@@ -259,7 +259,7 @@ exports.emailInviteToUsers = async (req, res) => {
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: 'hello@hippoai.ca',
+          user: 'hello@pendiumhealth.com',
           pass: process.env.NODEMAILER_PASS
         }
       });
@@ -267,7 +267,7 @@ exports.emailInviteToUsers = async (req, res) => {
     //send email to each email
     for (const email of emails) {
         const mailOptions = {
-            from: "HippoAI <hello@hippoai.ca>",
+            from: "Pendium Health - HippoAI <hello@pendiumhealth.com>",
             to: email,
             subject: `You're invited to sign up for HippoAI`,
             text: `
