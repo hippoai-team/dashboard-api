@@ -349,7 +349,7 @@ async function calculateChurn(activityTimeRange, User, Chat, Beta, userCohort) {
     return {
       totalChurnRate: churnRate.toFixed(2) + '%',
       churnPerWeek: churnPerWeek.toFixed(2) + '%',
-      churnDescription: `${usersInRange.length} beta users from beta list signed from cohort ${userCohort}. Between  ${startDate.toDateString()} and ${endDate.toDateString()}, ${inactiveUsers} users have not chatted in this time period. This is a churn rate of ${churnRate.toFixed(2)}% or ${churnPerWeek.toFixed(2)}% per week.`,
+      churnDescription: `${usersInRange.length} beta users from beta list signed from cohort ${userCohort}. Between  ${startDate.toDateString()} and ${endDate.toDateString()}, ${inactiveUsers.length} users have not chatted in this time period. This is a churn rate of ${churnRate.toFixed(2)}% or ${churnPerWeek.toFixed(2)}% per week.`,
       inactiveUsers: inactiveUsersWithLastActiveDate
     };
   }
