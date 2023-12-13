@@ -17,6 +17,11 @@ const betaUserSchema = new mongoose.Schema({
       type: String,
       default: 'dashboard',
     },
+    invite_sent: {
+      type: Boolean,
+      default: false,
+    },
+    
 
 
 });
