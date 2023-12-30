@@ -10,6 +10,7 @@ const authRoutes = require("./api/authRoutes");
 const betaListRoutes = require("./api/betaListRoute");
 const chatLogRoutes = require("./api/chatLogRoutes");
 const userRoutes = require("./api/userRoutes");
+const backendChatLogRoutes = require("./api/backendChatLogRoutes");
 // middlewares
 app.use(express.json({ extended: false }));
 app.use(cors());
@@ -37,6 +38,7 @@ app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
 app.use('/api/chatlogs', chatLogRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/backendchatlogs', backendChatLogRoutes)
 
 app.use('/admin', authRoutes);
 
