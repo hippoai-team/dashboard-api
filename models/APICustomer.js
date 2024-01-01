@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+dotenv.config();
 
-mongoose.connect(process.env.MONGO_URI_2, {
+pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });
@@ -25,4 +27,6 @@ const apiCustomerSchema = new mongoose.Schema({
 });
 
 
-const APICustomer = mongoose.model('api_keys', apiCustomerSchema);
+const APICustomer = pendium_db.model('api_customer', apiCustomerSchema, 'api_keys');
+
+module.exports = APICustomer;

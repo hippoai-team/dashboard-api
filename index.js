@@ -10,6 +10,7 @@ const authRoutes = require("./api/authRoutes");
 const betaListRoutes = require("./api/betaListRoute");
 const chatLogRoutes = require("./api/chatLogRoutes");
 const userRoutes = require("./api/userRoutes");
+const usageRoutes = require("./api/usageRoutes");
 // middlewares
 app.use(express.json({ extended: false }));
 app.use(cors());
@@ -17,7 +18,6 @@ app.use(bodyParser.json());
 
 // config
 dotenv.config();
-console.log(process.env.MONGO_URL);
 const MONGO_URL = process.env.MONGO_URL;
 const MONGO_URL_2 = process.env.MONGO_URL_2;
 // Connect to MongoDB
@@ -37,6 +37,7 @@ app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
 app.use('/api/chatlogs', chatLogRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/usage', usageRoutes)
 
 app.use('/admin', authRoutes);
 
