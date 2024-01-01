@@ -19,7 +19,7 @@ app.use(bodyParser.json());
 dotenv.config();
 console.log(process.env.MONGO_URL);
 const MONGO_URL = process.env.MONGO_URL;
-
+const MONGO_URL_2 = process.env.MONGO_URL_2;
 // Connect to MongoDB
 mongoose.connect(MONGO_URL, {
   useNewUrlParser: true,
