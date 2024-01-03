@@ -15,6 +15,7 @@ const UsageEntrySchema = new mongoose.Schema({
     api_key: String,
     input_count: Number,
     output_count: Number,
+    model: String,
 });
 
 const UsageEntry = pendium_db.model('usage_entry', UsageEntrySchema, 'usage');
