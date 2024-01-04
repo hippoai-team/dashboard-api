@@ -76,20 +76,21 @@ exports.index = async (req, res) => {
     if (statusFilter) {
       if (statusFilter === 'signed_up' || statusFilter === 'not_signed_up') {
         query.status = statusFilter; // Add the status filter to the query object
-        console.log('statusFilter', statusFilter)
-        console.log('query', query)
+
       } else if (statusFilter === 'used' || statusFilter === 'not_used') {
         const usageFilter = statusFilter === 'used' ? { $gt: 0 } : { $eq: 0 };
         query.usage = usageFilter;
-        console.log('usageFilter', usageFilter)
-        console.log('query', query)
+
       }
     }
     // Get distinct betaUser types
 
     // Get the number of betaUsers for each type of status based on search or filter
 
-
+    const sourceFilter = req.query.source || "";
+    if (sourceFilter) {
+      query.source = sourceFilter; // Add the status filter to the query object
+    }
 
     const statusCounts = {
       signed_up: 0,
