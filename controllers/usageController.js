@@ -28,9 +28,6 @@ exports.index = async (req, res) => {
         const customer_key = req.query.customer || "";
         const month = req.query.month || "";
         const query = {};
-        if (customer_key) {
-            query.api_key = customer_key;
-        }
         const months = await UsageEntry.aggregate([
             { $match: query },
             { $group: {
@@ -44,6 +41,16 @@ exports.index = async (req, res) => {
             endDate.setMonth(endDate.getMonth() + 1);
             query.timestamp = { $gte: startDate, $lt: endDate };
         }
+        //total usage enrtries this month
+        const totalUsageEntries = await UsageEntry.countDocuments(query);
+        if (customer_key) {
+            query.api_key = customer_key;
+        }
+       
+        //total usage entries for selected customer
+        const totalUsageEntriesForSelectedCustomer = await UsageEntry.countDocuments(query);
+        const totalUsagePercentageForSelectedCustomer = (totalUsageEntriesForSelectedCustomer / totalUsageEntries)
+        
         //get all api customers
         const apiCustomers = await APICustomer.find({});
         let usageEntries = [];
@@ -74,23 +81,31 @@ exports.index = async (req, res) => {
             
            
         }
-
-        
-        console.log('usageEntries', usageEntries);
-        //get all chat logs
         const query_logs = {};
-        if (customer_key) {
-            query_logs.api_key = customer_key;
-        }
+
         if (month) {
             const startDate = new Date(month);
             const endDate = new Date(month);
             endDate.setMonth(endDate.getMonth() + 1);
             query_logs.datetime = { $gte: startDate, $lt: endDate };
         }
+
+        //total chat logs this month
+        const totalChatLogs = await BackendChatLog.countDocuments(query_logs);
+        console.log('usageEntries', usageEntries);
+        //get all chat logs
+       
+        if (customer_key) {
+            query_logs.api_key = customer_key;
+        }
+       
         const chatLogs = await BackendChatLog.find(query_logs).sort({ timestamp: -1 }).skip(skip).limit(perPage);
+
+     
+
         //return api customers and usage entries
-        const data = { apiCustomers, usageEntries, chatLogs, months };
+
+        const data = { apiCustomers, usageEntries, chatLogs, months, totalUsagePercentageForSelectedCustomer};
         res.status(200).json(data);
     }
     catch (error) {
