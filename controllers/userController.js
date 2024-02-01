@@ -164,7 +164,7 @@ exports.index = async (req, res) => {
           email: 1,
           name: 1,
           status: 1,
-          signup_date: { $dateToString: { format: "%d/%m/%Y", date: "$signup_date" } },
+          signup_date: 1,
           usage: 1,
           feedback_count: 1,
           clicked_sources: 1,
