@@ -156,9 +156,9 @@ exports.index = async (req, res) => {
 
     const users = await User.aggregate([
       { $match: query },
+      { $sort: { signup_date: -1 } }, // Sorting by signup_date before skipping and limiting
       { $skip: skip },
       { $limit: perPage },
-      { $sort: { signup_date: -1 } },
       {
         $project: {
           email: 1,
@@ -204,8 +204,6 @@ exports.index = async (req, res) => {
         }
       }
     ]).allowDiskUse(true);
-    
-    
     
     const savedSourceTypeCounts = {};
     users.forEach(user => {
