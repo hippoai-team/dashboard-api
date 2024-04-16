@@ -1,0 +1,269 @@
+// controllers/SourceController.js
+const axios = require('axios');
+
+const { createNewSourceModel, createNewMasterSourceModel } = require('../models/NewSource');
+const clinical_guidelines_master = createNewSourceModel('clinical_guidelines_master');
+const review_articles_master = createNewSourceModel('review_articles_master');
+const formulary_lists_master = createNewSourceModel('formulary_lists_master');
+const newMasterSource = createNewMasterSourceModel('master_sources');
+
+const source_type_list = {
+    'clinical_guidelines': clinical_guidelines_master,
+    'review_articles': review_articles_master,
+    'formulary_lists': formulary_lists_master
+}
+
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
+//const PIPELINE_API_URL = 'http://127.0.0.1:8080';
+exports.store = async (req, res) => {
+  try {
+    const sourceData = req.body;
+    console.log(sourceData);
+    // Validate fields
+
+    if (!sourceData.subspecialty || typeof sourceData.subspecialty !== "string") {
+      console.log('error, invalid subspecialty', sourceData.subspecialty);
+      return res.status(400).json({ error: "Invalid subspecialty" });
+    }
+
+    if (!sourceData.title || typeof sourceData.title !== "string") {
+      console.log('error, invalid title', sourceData.title);
+      return res.status(400).json({ error: "Invalid title" });
+    }
+
+    if (!sourceData.publisher || typeof sourceData.publisher !== "string") {
+      console.log('error, invalid publisher', sourceData.publisher);
+      return res.status(400).json({ error: "Invalid publisher" });
+    }
+
+    if (!sourceData.source || typeof sourceData.source !== "string") {
+      console.log('error, invalid source', sourceData.source);
+      return res.status(400).json({ error: "Invalid source" });
+    }
+    const existingSource = await Source.findOne({ source: sourceData.source });
+    if (existingSource) {
+      console.log('error, source already exists', sourceData.source);
+      return res.status(400).json({ error: "Source already exists" });
+    }
+    if (typeof sourceData.year !== "string" || !/^\d{4}$/.test(sourceData.year)) {
+      console.log('error, invalid year', sourceData.year);
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    if (
+      typeof sourceData.status !== "string"    
+    ) {
+      console.log('error, invalid status', sourceData.status);
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    if (typeof sourceData.is_paid !== "boolean") {
+      console.log('error, invalid is_paid', sourceData.is_paid);
+      return res.status(400).json({ error: "Invalid payment status" });
+    }
+
+    if (!sourceData.source_type || typeof sourceData.source_type !== "string") {
+      console.log('error, invalid source_type', sourceData.source_type);
+      return res.status(400).json({ error: "Invalid source type" });
+    }
+
+    // Create a new Source instance and save it
+    const source = new Source(sourceData);
+    source.date_added = new Date();
+    source.date_modified = new Date();
+    await source.save();
+
+    res.status(201).json(source);
+  } catch (error) {
+    if (error.name === "ValidationError") {
+      console.log('error', error);
+      return res.status(400).json({ error: error.message });
+    }
+    console.log('error', error);
+    res.status(400).json({ error: "Failed to create source" });
+    
+  }
+};
+
+exports.index = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
+    const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
+
+    // Calculate the skip value based on the requested page
+    const skip = (page - 1) * perPage;
+
+    // Initializing the search query to status == 'remove' or 'removed'
+    let query = {}
+
+    // Handle text search
+    const search = req.query.search || "";
+    if (search) {
+      const regexSearch = { $regex: search, $options: "i" };
+
+      const searchQueries = [
+        { topic: regexSearch },
+        { category: regexSearch },
+        { subspecialty: regexSearch },
+        { title: regexSearch },
+        { publisher: regexSearch },
+      ];
+
+      if (!isNaN(search)) {
+        searchQueries.push({ year: parseInt(search) });
+      }
+
+    
+      query.$or = searchQueries;
+
+      
+    }
+
+    const sourceType = req.query.source_type || Object.keys(source_type_list)[0];
+
+    const sources = await source_type_list[sourceType].find(query).skip(skip).limit(perPage);
+    query['metadata.source_type'] = sourceType;
+    const masterSourceDocuments = await newMasterSource.find(query).select('metadata processed').skip(skip).limit(perPage);
+    const master_sources = masterSourceDocuments.map(doc => ({ ...doc.metadata, processed: doc.processed }));
+    console.log('master sources', master_sources);
+    const data = {
+        sources: sources,
+        source_types: Object.keys(source_type_list),
+        master_sources: master_sources,
+
+    };
+
+    res.json(data);
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "Failed to fetch sources" });
+  }
+};
+
+exports.deleteMultiple = async (req, res) => {
+  const { sourceIds } = req.body;
+
+
+  try {
+    const result = await Source.updateMany(
+      { _id: { $in: sourceIds } },
+      { $set: { status: remove } }
+    );
+
+    
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids: sourceIds });
+    //add source name to the response data
+    console.log(response.data);
+    
+
+    if (result.nModified > 0) {
+      res.status(200).json({ message: "Selected sources soft deleted successfully."});
+    } else {
+      res.status(200).json({ message: "No sources were modified. They might already be deleted or not found." });
+    }
+
+  } catch (error) {
+    res.status(500).json({ error: `Failed to soft delete selected sources: ${error.message}` });
+  }
+};
+
+
+exports.show = async (req, res) => {
+  try {
+    const source = await Source.findById(req.params.id);
+    if (!source) {
+      return res.status(404).json({ error: "Source not found" });
+    }
+    res.json(source);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch source" });
+  }
+};
+
+exports.update = async (req, res) => {
+  console.log('update', req.body, req.params.id)
+  try {
+    const source = await Source.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    if (!source) {
+      console.log('update error', error)
+      return res.status(404).json({ error: "Source not found" });
+    }
+
+    // Exclude date_added from the update
+    source.date_added = source.date_added;
+
+    // Update the date_modified field to the current date
+    source.date_modified = new Date();
+    await source.save();
+    res.json(source);
+  } catch (error) {
+    console.log('update error', error)
+    res.status(500).json({ error: "Failed to update source" });
+  }
+};
+
+exports.destroy = async (req, res) => {
+  try {
+    const id = req.params.id; 
+    const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
+
+    await Source.updateOne({ _id: req.params.id }, { status: 'remove' });
+    
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
+    console.log(response.data);
+    
+    res.status(200).send('Source soft deleted successfully');
+
+  } catch (error) {
+      res.status(500).send('Server error');
+  }
+  }
+
+
+exports.approve = async (req, res) => {
+  const id = req.params.id;
+  const sourceType = req.body.sourceType;
+  const source_metadata = await source_type_list[sourceType].findOne({ _id: id });
+    if (!source_metadata) {
+        return res.status(404).json({ error: "Source not found" });
+    }
+    //add id to the metadata
+    source_metadata.source_id = id;
+    //drop the _id field
+    delete source_metadata._id;
+    //create new master source instance with the source metadata
+    const masterSource = new newMasterSource({
+        metadata: source_metadata,
+        source_id: id,
+    })
+    //save the master source
+    await masterSource.save();
+  res.status(200).json({ message: "Source approved successfully", data: { title: source_metadata.title } });
+};
+
+exports.approveMultiple = async (req, res) => {
+  const { sourceIds, sourceType } = req.body;
+  try {
+    const sources_metadata = await source_type_list[sourceType].find({ _id: { $in: sourceIds } });
+    if (sources_metadata.length !== sourceIds.length) {
+      return res.status(404).json({ error: "One or more sources not found" });
+    }
+    const masterSources = sources_metadata.map(metadata => {
+      const source_id = metadata._id;
+      delete metadata._id;
+      return new newMasterSource({
+        metadata: metadata,
+        source_id: source_id,
+      });
+    });
+    for (const masterSource of masterSources) {
+      await masterSource.save();
+    }
+    res.status(200).json({ message: "Sources approved successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to approve sources" });
+  }
+};
