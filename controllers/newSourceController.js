@@ -86,59 +86,73 @@ exports.store = async (req, res) => {
 };
 
 exports.index = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
-    const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-
-    // Calculate the skip value based on the requested page
-    const skip = (page - 1) * perPage;
-
-    // Initializing the search query to status == 'remove' or 'removed'
-    let query = {}
-
-    // Handle text search
-    const search = req.query.search || "";
-    if (search) {
-      const regexSearch = { $regex: search, $options: "i" };
-
-      const searchQueries = [
-        { topic: regexSearch },
-        { category: regexSearch },
-        { subspecialty: regexSearch },
-        { title: regexSearch },
-        { publisher: regexSearch },
-      ];
-
-      if (!isNaN(search)) {
-        searchQueries.push({ year: parseInt(search) });
+    try {
+      const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
+      const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
+      const tab = parseInt(req.query.active_tab); // Convert active_tab to integer to use in logic
+  
+      const skip = (page - 1) * perPage; // Calculate the skip value based on the requested page
+  
+      // Initializing the base query
+      let query = {};
+  
+      // Handling text search universally for both tabs
+      const search = req.query.search || "";
+      if (search) {
+        const regexSearch = { $regex: search, $options: "i" };
+        let searchQueries = [
+          { title: regexSearch },
+          { publisher: regexSearch },
+          { subspecialty: regexSearch }
+        ];
+  
+        // Adjusting search fields based on tab, assuming different data structures for master sources
+        if (tab === 1) { // Assume tab 1 is for master sources with different document structure
+          searchQueries = [
+            { 'metadata.title': regexSearch },
+            { 'metadata.publisher': regexSearch },
+            { 'metadata.subspecialty': regexSearch }
+          ];
+        }
+        query.$or = searchQueries;
       }
-
-    
-      query.$or = searchQueries;
-
-      
+  
+      // Handle source type filtering based on tab
+      const sourceType = req.query.source_type || "";
+      if (sourceType) {
+        if (tab === 0) { // Sources
+          query.source_type = sourceType;
+        } else { // Master Sources, assuming different data structure
+          query['metadata.source_type'] = sourceType;
+        }
+      }
+  
+      // Fetch data based on tab selection
+      let sources, master_sources, total_source_counts;
+      if (tab === 0) { // Fetching regular sources
+        sources = await source_type_list[sourceType].find(query).skip(skip).limit(perPage);
+        total_source_counts = { sources: await source_type_list[sourceType].countDocuments(query) };
+      } else { // Fetching master sources
+        master_sources = await newMasterSource.find(query, 'metadata processed').skip(skip).limit(perPage);
+        
+        total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
+      }
+  
+      // Constructing the response data structure
+      const data = {
+        sources: tab === 0 ? sources : [],
+        master_sources: tab === 1 ? master_sources.map(doc => doc.metadata) : [],
+        source_types: Object.keys(source_type_list), // Assuming this list is defined globally or imported
+        total_source_counts
+      };
+  
+      res.json(data); // Sending the constructed data as response
+    } catch (error) {
+      console.error("Error in fetching sources:", error);
+      res.status(500).json({ error: "Failed to fetch sources due to server error" });
     }
-
-    const sourceType = req.query.source_type || Object.keys(source_type_list)[0];
-
-    const sources = await source_type_list[sourceType].find(query).skip(skip).limit(perPage);
-    query['metadata.source_type'] = sourceType;
-    const masterSourceDocuments = await newMasterSource.find(query).select('metadata processed').skip(skip).limit(perPage);
-    const master_sources = masterSourceDocuments.map(doc => ({ ...doc.metadata, processed: doc.processed }));
-    console.log('master sources', master_sources);
-    const data = {
-        sources: sources,
-        source_types: Object.keys(source_type_list),
-        master_sources: master_sources,
-
-    };
-
-    res.json(data);
-  } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: "Failed to fetch sources" });
-  }
-};
+  };
+  
 
 exports.deleteMultiple = async (req, res) => {
   const { sourceIds } = req.body;
