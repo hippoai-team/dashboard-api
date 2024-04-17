@@ -118,8 +118,11 @@ exports.index = async (req, res) => {
       }
   
       // Handle source type filtering based on tab
-      const sourceType = req.query.source_type || 'clinical_guidelines'
-      if (sourceType) {
+      let sourceType = req.query.source_type;
+      if (tab === 0 && !sourceType) { // For tab 0, default to the first source type if not provided
+        sourceType = Object.keys(source_type_list)[0];
+        query.source_type = sourceType;
+      } else if (sourceType) {
         if (tab === 0) { // Sources
           query.source_type = sourceType;
         } else { // Master Sources, assuming different data structure
