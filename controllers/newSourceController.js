@@ -118,7 +118,7 @@ exports.index = async (req, res) => {
       }
   
       // Handle source type filtering based on tab
-      const sourceType = req.query.source_type || "";
+      const sourceType = req.query.source_type || 'clinical_guidelines'
       if (sourceType) {
         if (tab === 0) { // Sources
           query.source_type = sourceType;
@@ -134,7 +134,7 @@ exports.index = async (req, res) => {
         total_source_counts = { sources: await source_type_list[sourceType].countDocuments(query) };
       } else { // Fetching master sources
         master_sources = await newMasterSource.find(query, 'metadata processed').skip(skip).limit(perPage);
-        
+
         total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
       }
   
