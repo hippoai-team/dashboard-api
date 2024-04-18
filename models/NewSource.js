@@ -14,7 +14,6 @@ const newSourceSchema = new mongoose.Schema({
   source_type: String,
   access_status: String,
   load_type: String,
-  year: Number,
   content_type: String,
   language: String,
   audience: String,

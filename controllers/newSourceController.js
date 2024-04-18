@@ -5,12 +5,14 @@ const { createNewSourceModel, createNewMasterSourceModel } = require('../models/
 const clinical_guidelines_master = createNewSourceModel('clinical_guidelines_master');
 const review_articles_master = createNewSourceModel('review_articles_master');
 const formulary_lists_master = createNewSourceModel('formulary_lists_master');
+const drug_monographs_master = createNewSourceModel('drug_monograph_master');
 const newMasterSource = createNewMasterSourceModel('master_sources');
 
 const source_type_list = {
     'clinical_guidelines': clinical_guidelines_master,
     'review_articles': review_articles_master,
-    'formulary_lists': formulary_lists_master
+    'formulary_lists': formulary_lists_master,
+    'drug_monographs': drug_monographs_master
 }
 
 const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
