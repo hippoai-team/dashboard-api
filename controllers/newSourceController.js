@@ -1,6 +1,6 @@
 // controllers/SourceController.js
 const axios = require('axios');
-
+const mongoose = require('mongoose');
 const { createNewSourceModel, createNewMasterSourceModel } = require('../models/NewSource');
 const clinical_guidelines_master = createNewSourceModel('clinical_guidelines_master');
 const review_articles_master = createNewSourceModel('review_articles_master');
@@ -15,8 +15,8 @@ const source_type_list = {
     'drug_monographs': drug_monographs_master
 }
 
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
-//const PIPELINE_API_URL = 'http://127.0.0.1:8080';
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
+const PIPELINE_API_URL = 'http://127.0.0.1:8000';
 exports.store = async (req, res) => {
   try {
     const sourceData = req.body;
@@ -138,7 +138,15 @@ exports.index = async (req, res) => {
         sources = await source_type_list[sourceType].find(query).skip(skip).limit(perPage);
         total_source_counts = { sources: await source_type_list[sourceType].countDocuments(query) };
       } else { // Fetching master sources
-        master_sources = await newMasterSource.find(query, 'metadata processed').skip(skip).limit(perPage);
+        master_sources = await newMasterSource.find(query, 'metadata processed id_').skip(skip).limit(perPage).lean();
+
+        // Add the processed field to the metadata of master sources
+        master_sources = master_sources.map(doc => {
+          doc.metadata.processed = doc.processed;
+          //adding the _id tag for checkbox filtering on the dashboard to keep it consistent.
+          doc.metadata._id = doc._id;
+          return doc.metadata;
+        });
 
         total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
       }
@@ -146,7 +154,7 @@ exports.index = async (req, res) => {
       // Constructing the response data structure
       const data = {
         sources: tab === 0 ? sources : [],
-        master_sources: tab === 1 ? master_sources.map(doc => doc.metadata) : [],
+        master_sources: tab === 1 ? master_sources : [],
         source_types: Object.keys(source_type_list), // Assuming this list is defined globally or imported
         total_source_counts
       };
@@ -242,20 +250,21 @@ exports.destroy = async (req, res) => {
 
 
 exports.approve = async (req, res) => {
-  const id = req.params.id;
-  const sourceType = req.body.sourceType;
-  const source_metadata = await source_type_list[sourceType].findOne({ _id: id });
-    if (!source_metadata) {
-        return res.status(404).json({ error: "Source not found" });
-    }
-    //add id to the metadata
-    source_metadata.source_id = id;
-    //drop the _id field
-    delete source_metadata._id;
+  const { sourceId, sourceType } = req.body;
+  console.log('approve', sourceId, sourceType)
+  var source_metadata = await source_type_list[sourceType].findOne({ _id: sourceId });
+  if (!source_metadata) {
+    return res.status(404).json({ error: "Source not found" });
+  }
+  
+  // Add the id as a param field to the source_metadata
+  source_metadata.set('source_id', sourceId);
+
     //create new master source instance with the source metadata
     const masterSource = new newMasterSource({
+        _id: new mongoose.Types.ObjectId(sourceId),
         metadata: source_metadata,
-        source_id: id,
+        source_id: sourceId
     })
     //save the master source
     await masterSource.save();
@@ -271,6 +280,7 @@ exports.approveMultiple = async (req, res) => {
     }
     const masterSources = sources_metadata.map(metadata => {
       const source_id = metadata._id;
+      metadata.set('source_id', source_id);
       delete metadata._id;
       return new newMasterSource({
         metadata: metadata,
@@ -286,3 +296,38 @@ exports.approveMultiple = async (req, res) => {
     res.status(500).json({ error: "Failed to approve sources" });
   }
 };
+
+exports.process = async (req, res) => {
+  const { sourceId } = req.body;
+  try {
+    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: [sourceId] });
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+exports.processMultiple = async (req, res) => {
+  const { sourceIds } = req.body;
+  try {
+    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: sourceIds });
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to process sources" });
+  }
+}
+
+exports.getPipelineStatus = async (req, res) => {
+  try {
+    const response = await axios.get(`${PIPELINE_API_URL}/status`);
+    res.status(200).json(response.data);
+  } catch (error) {
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ECONNRESET') {
+      res.status(200).json({status: 'unavailable', error: "Pipeline API is unavailable"});
+    } else {
+      res.status(500).json({ error: "Failed to get pipeline status" });
+    }
+  }
+}

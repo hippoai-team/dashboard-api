@@ -18,7 +18,8 @@ const newSourceSchema = new mongoose.Schema({
   language: String,
   audience: String,
   keywords: [String],
-  country: String
+  country: String,
+  source_id: String
 });
 
 //create master source model
