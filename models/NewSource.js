@@ -24,6 +24,10 @@ const newSourceSchema = new mongoose.Schema({
     type: String,
     required: false
   },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  },
 });
 const newMasterSourceSchema = new mongoose.Schema({
   _id: {
@@ -69,7 +73,12 @@ const newMasterSourceSchema = new mongoose.Schema({
   source_id:{
     type: String,
     default: ""
-  }
+  },
+  date_added: {
+    type: Date,
+    default: Date.now
+  },
+
 });
 
 function createNewSourceModel(collectionName) {

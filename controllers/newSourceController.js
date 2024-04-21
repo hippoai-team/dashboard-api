@@ -19,13 +19,23 @@ const source_type_list = {
 const PIPELINE_API_URL = 'http://127.0.0.1:8000';
 exports.store = async (req, res) => {
   const sources = req.body.sources; // Assuming sources is an array of source data
-  console.log('sources',sources)
+  console.log('sources', sources);
   if (!sources || !Array.isArray(sources)) {
     return res.status(400).send({ error: 'Invalid input' });
   }
 
-  try {
-    const createdSources = await Promise.all(sources.map(async sourceData => {
+  let createdSources = [];
+  let sourceCreationStatus = [];
+
+  for (const sourceData of sources) {
+    try {
+      // Check if source URL already exists
+      const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
+      if (existingSource) {
+        sourceCreationStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
+        continue; // Skip to the next sourceData if this URL already exists
+      }
+
       // Create a new source object
       const id = new mongoose.Types.ObjectId();
       const newSource = new newMasterSource({
@@ -33,17 +43,21 @@ exports.store = async (req, res) => {
         metadata: { ...sourceData, source_id: id.toString() }, // Store all form data in metadata, including the mongoose id
         source_id: id.toString()
       });
-      // Save to MongoDB
-      return newSource.save();
-      
-    }));
 
-    res.status(201).json({ message: "Sources created successfully", data: createdSources });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to create sources" });
+      // Save to MongoDB
+      const createdSource = await newSource.save();
+      createdSources.push(createdSource);
+      sourceCreationStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
+    } catch (error) {
+      console.error(error);
+      sourceCreationStatus.push({ source_url: sourceData.source_url, source_title:sourceData.title, status: 'error', error: error.message });
+    }
   }
+
+  res.status(201).json({ createdSources, sourceCreationStatus });
 };
+
+
 
 
 exports.index = async (req, res) => {
@@ -55,6 +69,7 @@ exports.index = async (req, res) => {
       const skip = (page - 1) * perPage;
       const search = req.query.search || "";
       const sourceType = req.query.source_type || "";
+      const status = req.query.status || "";
       let query = {};
 
       // Universal search setup, adjusting fields based on active tab
@@ -73,16 +88,29 @@ exports.index = async (req, res) => {
           query.$or = searchQueries;
       }
 
-      // Filtering by source type
+      // Filtering by source type and status
       if (tab === 0) {
-        //source type or first item in source list if sourcetype is ""
           query.source_type = sourceType || Object.keys(source_type_list)[0];
-          // Only show pending sources in tab 0
-          query.status = { $nin: ["approved", "rejected"] };
-
+          if (status) {
+              if (status === 'pending') {
+                  query.$or = [{ status: { $exists: false } }, { status: 'pending' }];
+              } else {
+                  query.status = status;
+              }
+          } else {
+              query.$or = [{ status: { $exists: false } }, { status: 'pending' }];
+          }
       } else {
           if (sourceType) {
-          query['metadata.source_type'] = sourceType;
+              query['metadata.source_type'] = sourceType;
+          }
+          if (status) {
+              if (status === 'processed') {
+                  query.processed = true;
+              } else {
+                  query.status = status;
+                  query.processed = false;
+              }
           }
       }
 
@@ -93,7 +121,7 @@ exports.index = async (req, res) => {
           sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage });
           total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
       } else {
-          master_sources = await newMasterSource.find(query, 'metadata processed id_', { skip, limit: perPage })
+          master_sources = await newMasterSource.find(query, 'metadata processed id_', { skip, limit: perPage });
           master_sources = master_sources.map(doc => ({
               ...doc.metadata,
               processed: doc.processed,
@@ -119,32 +147,7 @@ exports.index = async (req, res) => {
 
   
 
-exports.deleteMultiple = async (req, res) => {
-  const { sourceIds } = req.body;
 
-
-  try {
-    const result = await Source.updateMany(
-      { _id: { $in: sourceIds } },
-      { $set: { status: remove } }
-    );
-
-    
-    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids: sourceIds });
-    //add source name to the response data
-    console.log(response.data);
-    
-
-    if (result.nModified > 0) {
-      res.status(200).json({ message: "Selected sources soft deleted successfully."});
-    } else {
-      res.status(200).json({ message: "No sources were modified. They might already be deleted or not found." });
-    }
-
-  } catch (error) {
-    res.status(500).json({ error: `Failed to soft delete selected sources: ${error.message}` });
-  }
-};
 
 
 exports.show = async (req, res) => {
@@ -220,19 +223,39 @@ exports.approve = async (req, res) => {
 
     await Promise.all(sources_metadata.map(metadata => metadata.save()));
 
-    const masterSources = sources_metadata.map(metadata => {
-      return new newMasterSource({
-        _id: new mongoose.Types.ObjectId(metadata._id),
-        metadata: metadata,
-        source_id: metadata._id,
-      });
-    });
+    const statusReport = [];
 
-    await Promise.all(masterSources.map(masterSource => masterSource.save()));
+    for (const metadata of sources_metadata) {
+      const existingMasterSource = await newMasterSource.findOne({ 'metadata.source_url': metadata.source_url });
+      if (existingMasterSource) {
+        statusReport.push({
+          url: metadata.source_url,
+          title: metadata.title,
+          status: 'exists'
+        });
+      } else {
+        const masterSource = new newMasterSource({
+          _id: new mongoose.Types.ObjectId(metadata._id),
+          metadata: metadata,
+          source_id: metadata._id,
+          date_added: new Date()
+        });
+        await masterSource.save();
+        statusReport.push({
+          url: metadata.source_url,
+          title: metadata.title,
+          status: 'approved',
+          timestamp: new Date()
+        });
+      }
+    }
 
-    const responseMessage = isSingleSource ? "Source approved successfully" : "Sources approved successfully";
-    const responseData = isSingleSource ? { title: sources_metadata[0].title } : {};
-    res.status(200).json({ message: responseMessage, data: responseData });
+    const failedSources = statusReport.filter(report => report.status === 'failed').map(report => report.url);
+    if (failedSources.length > 0) {
+      return res.status(500).json({ error: "Failed to approve sources", failedSources });
+    }
+
+    res.status(200).json({ statusReport });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to approve sources" });
@@ -247,20 +270,31 @@ exports.reject = async (req, res) => {
       return res.status(404).json({ error: "One or more sources not found" });
     }
 
-    await Promise.all(sources_metadata.map(metadata => {
+    const statusReport = [];
+
+    for (const metadata of sources_metadata) {
       metadata.status = 'rejected';
       metadata.reviewed_at = new Date();
-      return metadata.save();
-    }));
+      await metadata.save();
+      statusReport.push({
+        url: metadata.source_url,
+        title: metadata.title,
+        status: 'rejected',
+        timestamp: new Date()
+      });
+    }
 
-    const responseMessage = sourceIds.length === 1 ? "Source rejected successfully" : "Sources rejected successfully";
-    res.status(200).json({ message: responseMessage });
+    const failedSources = statusReport.filter(report => report.status === 'failed').map(report => report.url);
+    if (failedSources.length > 0) {
+      return res.status(500).json({ error: "Failed to reject sources", failedSources });
+    }
+
+    res.status(200).json({ statusReport });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to reject source(s)" });
   }
 };
-
 
 exports.process = async (req, res) => {
   const { sourceIds } = req.body;
