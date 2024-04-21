@@ -12,4 +12,5 @@ router.post('/status', newSourceController.getPipelineStatus);
 router.post('/reject', newSourceController.reject);
 router.post('/delete', newSourceController.delete);
 router.post('/store', newSourceController.store);
+router.put('/update', newSourceController.update);
 module.exports = router;

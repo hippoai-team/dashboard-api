@@ -19,20 +19,19 @@ const source_type_list = {
 const PIPELINE_API_URL = 'http://127.0.0.1:8000';
 exports.store = async (req, res) => {
   const sources = req.body.sources; // Assuming sources is an array of source data
-  console.log('sources', sources);
   if (!sources || !Array.isArray(sources)) {
     return res.status(400).send({ error: 'Invalid input' });
   }
 
   let createdSources = [];
-  let sourceCreationStatus = [];
+  let sourceActionStatus = [];
 
   for (const sourceData of sources) {
     try {
       // Check if source URL already exists
       const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
       if (existingSource) {
-        sourceCreationStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
+        sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
         continue; // Skip to the next sourceData if this URL already exists
       }
 
@@ -47,14 +46,14 @@ exports.store = async (req, res) => {
       // Save to MongoDB
       const createdSource = await newSource.save();
       createdSources.push(createdSource);
-      sourceCreationStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
+      sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
     } catch (error) {
       console.error(error);
-      sourceCreationStatus.push({ source_url: sourceData.source_url, source_title:sourceData.title, status: 'error', error: error.message });
+      sourceActionStatus.push({ source_url: sourceData.source_url, source_title:sourceData.title, status: 'error', error: error.message });
     }
   }
 
-  res.status(201).json({ createdSources, sourceCreationStatus });
+  res.status(201).json({ createdSources, sourceActionStatus });
 };
 
 
@@ -149,40 +148,87 @@ exports.index = async (req, res) => {
 
 
 
-
 exports.show = async (req, res) => {
   try {
-    const source = await Source.findById(req.params.id);
-    if (!source) {
-      return res.status(404).json({ error: "Source not found" });
+    const { id } = req.params;
+    const { tab, sourceTypeFilter } = req.query;
+    let sourceModel;
+    let responseData;
+
+    if (tab === '0') {
+      sourceModel = source_type_list[sourceTypeFilter];
+      const source = await sourceModel.findById(id);
+      if (!source) {
+        return res.status(404).json({ error: "Source not found" });
+      }
+      responseData = source;
+    } else if (tab === '1') {
+      sourceModel = newMasterSource;
+      const source = await sourceModel.findById(id);
+      if (!source) {
+        return res.status(404).json({ error: "Source not found" });
+      }
+      responseData = source.metadata;
+    } else {
+      return res.status(400).json({ error: "Invalid tab selection" });
     }
-    res.json(source);
+
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch source" });
   }
 };
 
 exports.update = async (req, res) => {
-  console.log('update', req.body, req.params.id)
+  const { sourceType, tab, id, ...sourceData } = req.body;
+  let sourceActionStatus = [];
   try {
-    const source = await Source.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    if (!source) {
-      console.log('update error', error)
-      return res.status(404).json({ error: "Source not found" });
+    let updateResult;
+    let sourceTitle, sourceUrl;
+    if (tab === '0') {
+      const source_metadata = await source_type_list[sourceType].findById(id);
+      if (!source_metadata) {
+        sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
+        return res.status(404).json({ error: "Source not found", sourceActionStatus });
+      }
+
+      sourceTitle = source_metadata.title;
+      sourceUrl = source_metadata.source_url;
+
+      for (const key in sourceData) {
+        source_metadata[key] = sourceData[key];
+      }
+
+      updateResult = await source_metadata.save();
+      sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
+    } else if (tab === '1') {
+      const master_source_document = await newMasterSource.findById(id);
+      if (!master_source_document) {
+        sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
+        return res.status(404).json({ error: "Master source not found", sourceActionStatus });
+      }
+
+      sourceTitle = master_source_document.metadata.title;
+      sourceUrl = master_source_document.metadata.source_url;
+
+      for (const key in sourceData) {
+        master_source_document.metadata[key] = sourceData[key];
+      }
+
+      updateResult = await master_source_document.save();
+      sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
+    } else {
+      sourceActionStatus.push({ source_title: "", source_url: "", status: 'invalid_tab' });
+      return res.status(400).json({ error: "Invalid tab selection", sourceActionStatus });
     }
 
-    // Exclude date_added from the update
-    source.date_added = source.date_added;
-
-    // Update the date_modified field to the current date
-    source.date_modified = new Date();
-    await source.save();
-    res.json(source);
+    if (updateResult) {
+      res.status(200).json({ message: "Source updated successfully", sourceActionStatus });
+    }
   } catch (error) {
-    console.log('update error', error)
-    res.status(500).json({ error: "Failed to update source" });
+    console.error("Error updating source:", error);
+    sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'error', error: error.message });
+    res.status(500).json({ error: "Failed to update source due to server error", sourceActionStatus });
   }
 };
 
