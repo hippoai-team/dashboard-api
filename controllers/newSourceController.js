@@ -88,83 +88,76 @@ exports.store = async (req, res) => {
 };
 
 exports.index = async (req, res) => {
-    try {
-      const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
-      const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-      const tab = parseInt(req.query.active_tab); // Convert active_tab to integer to use in logic
-  
-      const skip = (page - 1) * perPage; // Calculate the skip value based on the requested page
-  
-      // Initializing the base query
-      let query = {};
-  
-      // Handling text search universally for both tabs
+  try {
+      const page = parseInt(req.query.page) || 1;
+      const perPage = parseInt(req.query.perPage) || 10;
+      const tab = parseInt(req.query.active_tab);
+
+      const skip = (page - 1) * perPage;
       const search = req.query.search || "";
+      const sourceType = req.query.source_type || "";
+      let query = {};
+
+      // Universal search setup, adjusting fields based on active tab
+      const baseSearch = { $regex: search, $options: "i" };
+      const searchQueries = tab === 1 ? [
+          { 'metadata.title': baseSearch },
+          { 'metadata.publisher': baseSearch },
+          { 'metadata.subspecialty': baseSearch }
+      ] : [
+          { title: baseSearch },
+          { publisher: baseSearch },
+          { subspecialty: baseSearch }
+      ];
+
       if (search) {
-        const regexSearch = { $regex: search, $options: "i" };
-        let searchQueries = [
-          { title: regexSearch },
-          { publisher: regexSearch },
-          { subspecialty: regexSearch }
-        ];
-  
-        // Adjusting search fields based on tab, assuming different data structures for master sources
-        if (tab === 1) { // Assume tab 1 is for master sources with different document structure
-          searchQueries = [
-            { 'metadata.title': regexSearch },
-            { 'metadata.publisher': regexSearch },
-            { 'metadata.subspecialty': regexSearch }
-          ];
-        }
-        query.$or = searchQueries;
+          query.$or = searchQueries;
       }
-  
-      // Handle source type filtering based on tab
-      let sourceType = req.query.source_type;
-      if (tab === 0 && !sourceType) { // For tab 0, default to the first source type if not provided
-        sourceType = Object.keys(source_type_list)[0];
-        query.source_type = sourceType;
-      } else if (sourceType) {
-        if (tab === 0) { // Sources
-          query.source_type = sourceType;
-        } else { // Master Sources, assuming different data structure
+
+      // Filtering by source type
+      if (tab === 0) {
+        //source type or first item in source list if sourcetype is ""
+          query.source_type = sourceType || Object.keys(source_type_list)[0];
+          // Only show pending sources in tab 0
+          query.status = { $nin: ["approved", "rejected"] };
+
+      } else {
+          if (sourceType) {
           query['metadata.source_type'] = sourceType;
-        }
+          }
       }
-  
-      // Fetch data based on tab selection
+
+      // Fetching data based on tab selection
       let sources, master_sources, total_source_counts;
-      if (tab === 0) { // Fetching regular sources
-        sources = await source_type_list[sourceType].find(query).skip(skip).limit(perPage);
-        total_source_counts = { sources: await source_type_list[sourceType].countDocuments(query) };
-      } else { // Fetching master sources
-        master_sources = await newMasterSource.find(query, 'metadata processed id_').skip(skip).limit(perPage).lean();
-
-        // Add the processed field to the metadata of master sources
-        master_sources = master_sources.map(doc => {
-          doc.metadata.processed = doc.processed;
-          //adding the _id tag for checkbox filtering on the dashboard to keep it consistent.
-          doc.metadata._id = doc._id;
-          return doc.metadata;
-        });
-
-        total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
+      if (tab === 0) {
+          const effectiveSourceType = sourceType || Object.keys(source_type_list)[0];
+          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage });
+          total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
+      } else {
+          master_sources = await newMasterSource.find(query, 'metadata processed id_', { skip, limit: perPage })
+          master_sources = master_sources.map(doc => ({
+              ...doc.metadata,
+              processed: doc.processed,
+              _id: doc._id  // Adding the _id tag for checkbox filtering
+          }));
+          total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
       }
-  
+
       // Constructing the response data structure
       const data = {
-        sources: tab === 0 ? sources : [],
-        master_sources: tab === 1 ? master_sources : [],
-        source_types: Object.keys(source_type_list), // Assuming this list is defined globally or imported
-        total_source_counts
+          sources: tab === 0 ? sources : [],
+          master_sources: tab === 1 ? master_sources : [],
+          source_types: Object.keys(source_type_list),
+          total_source_counts
       };
-  
-      res.json(data); // Sending the constructed data as response
-    } catch (error) {
+
+      res.json(data);
+  } catch (error) {
       console.error("Error in fetching sources:", error);
       res.status(500).json({ error: "Failed to fetch sources due to server error" });
-    }
-  };
+  }
+};
+
   
 
 exports.deleteMultiple = async (req, res) => {
@@ -250,57 +243,71 @@ exports.destroy = async (req, res) => {
 
 
 exports.approve = async (req, res) => {
-  const { sourceId, sourceType } = req.body;
-  console.log('approve', sourceId, sourceType)
-  var source_metadata = await source_type_list[sourceType].findOne({ _id: sourceId });
-  if (!source_metadata) {
-    return res.status(404).json({ error: "Source not found" });
-  }
-  
-  // Add the id as a param field to the source_metadata
-  source_metadata.set('source_id', sourceId);
-
-    //create new master source instance with the source metadata
-    const masterSource = new newMasterSource({
-        _id: new mongoose.Types.ObjectId(sourceId),
-        metadata: source_metadata,
-        source_id: sourceId
-    })
-    //save the master source
-    await masterSource.save();
-  res.status(200).json({ message: "Source approved successfully", data: { title: source_metadata.title } });
-};
-
-exports.approveMultiple = async (req, res) => {
   const { sourceIds, sourceType } = req.body;
+  const isSingleSource = !Array.isArray(sourceIds) || sourceIds.length === 1;
+  const sourceIdArray = isSingleSource ? [sourceIds].flat() : sourceIds;
+
   try {
-    const sources_metadata = await source_type_list[sourceType].find({ _id: { $in: sourceIds } });
-    if (sources_metadata.length !== sourceIds.length) {
+    const sources_metadata = await source_type_list[sourceType].find({ _id: { $in: sourceIdArray } });
+    if (sources_metadata.length !== sourceIdArray.length) {
       return res.status(404).json({ error: "One or more sources not found" });
     }
+
+    sources_metadata.forEach(metadata => {
+      metadata.status = 'approved';
+      metadata.reviewed_at = new Date();
+      metadata.set('source_id', metadata._id);
+    });
+
+    await Promise.all(sources_metadata.map(metadata => metadata.save()));
+
     const masterSources = sources_metadata.map(metadata => {
-      const source_id = metadata._id;
-      metadata.set('source_id', source_id);
-      delete metadata._id;
       return new newMasterSource({
+        _id: new mongoose.Types.ObjectId(metadata._id),
         metadata: metadata,
-        source_id: source_id,
+        source_id: metadata._id,
       });
     });
-    for (const masterSource of masterSources) {
-      await masterSource.save();
-    }
-    res.status(200).json({ message: "Sources approved successfully" });
+
+    await Promise.all(masterSources.map(masterSource => masterSource.save()));
+
+    const responseMessage = isSingleSource ? "Source approved successfully" : "Sources approved successfully";
+    const responseData = isSingleSource ? { title: sources_metadata[0].title } : {};
+    res.status(200).json({ message: responseMessage, data: responseData });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to approve sources" });
   }
 };
 
-exports.process = async (req, res) => {
-  const { sourceId } = req.body;
+exports.reject = async (req, res) => {
+  const { sourceIds, sourceType } = req.body;
   try {
-    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: [sourceId] });
+    const sources_metadata = await source_type_list[sourceType].find({ _id: { $in: sourceIds } });
+    if (sources_metadata.length !== sourceIds.length) {
+      return res.status(404).json({ error: "One or more sources not found" });
+    }
+
+    await Promise.all(sources_metadata.map(metadata => {
+      metadata.status = 'rejected';
+      metadata.reviewed_at = new Date();
+      return metadata.save();
+    }));
+
+    const responseMessage = sourceIds.length === 1 ? "Source rejected successfully" : "Sources rejected successfully";
+    res.status(200).json({ message: responseMessage });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to reject source(s)" });
+  }
+};
+
+
+exports.process = async (req, res) => {
+  const { sourceIds } = req.body;
+  console.log(sourceIds)
+  try {
+    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: sourceIds });
     res.status(200).json(response.data);
   } catch (error) {
     console.error(error);
@@ -308,20 +315,26 @@ exports.process = async (req, res) => {
   }
 }
 
-exports.processMultiple = async (req, res) => {
+
+exports.delete = async (req, res) => {
+  
   const { sourceIds } = req.body;
+  console.log(sourceIds)
   try {
-    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: sourceIds });
-    res.status(200).json(response.data);
+    const response = await axios.post(`${PIPELINE_API_URL}/delete`, { document_ids: sourceIds });
+    res.status(200).json({ message: "Source deleted successfully", data: response.data });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to process sources" });
+    res.status(500).json({ error: "Failed to delete source" });
   }
-}
+};
+
+
 
 exports.getPipelineStatus = async (req, res) => {
   try {
     const response = await axios.get(`${PIPELINE_API_URL}/status`);
+    console.log(response.data);
     res.status(200).json(response.data);
   } catch (error) {
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ECONNRESET') {

@@ -19,10 +19,12 @@ const newSourceSchema = new mongoose.Schema({
   audience: String,
   keywords: [String],
   country: String,
-  source_id: String
+  source_id: String,
+  status: {
+    type: String,
+    required: false
+  },
 });
-
-//create master source model
 const newMasterSourceSchema = new mongoose.Schema({
   _id: {
     type: mongoose.Schema.Types.ObjectId,
