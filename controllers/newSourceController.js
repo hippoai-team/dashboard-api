@@ -214,8 +214,10 @@ exports.update = async (req, res) => {
       for (const key in sourceData) {
         master_source_document.metadata[key] = sourceData[key];
       }
+      master_source_document.markModified('metadata');
 
       updateResult = await master_source_document.save();
+
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
     } else {
       sourceActionStatus.push({ source_title: "", source_url: "", status: 'invalid_tab' });
