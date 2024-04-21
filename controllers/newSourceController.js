@@ -18,74 +18,33 @@ const source_type_list = {
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
 const PIPELINE_API_URL = 'http://127.0.0.1:8000';
 exports.store = async (req, res) => {
+  const sources = req.body.sources; // Assuming sources is an array of source data
+  console.log('sources',sources)
+  if (!sources || !Array.isArray(sources)) {
+    return res.status(400).send({ error: 'Invalid input' });
+  }
+
   try {
-    const sourceData = req.body;
-    console.log(sourceData);
-    // Validate fields
+    const createdSources = await Promise.all(sources.map(async sourceData => {
+      // Create a new source object
+      const id = new mongoose.Types.ObjectId();
+      const newSource = new newMasterSource({
+        _id: id,
+        metadata: { ...sourceData, source_id: id.toString() }, // Store all form data in metadata, including the mongoose id
+        source_id: id.toString()
+      });
+      // Save to MongoDB
+      return newSource.save();
+      
+    }));
 
-    if (!sourceData.subspecialty || typeof sourceData.subspecialty !== "string") {
-      console.log('error, invalid subspecialty', sourceData.subspecialty);
-      return res.status(400).json({ error: "Invalid subspecialty" });
-    }
-
-    if (!sourceData.title || typeof sourceData.title !== "string") {
-      console.log('error, invalid title', sourceData.title);
-      return res.status(400).json({ error: "Invalid title" });
-    }
-
-    if (!sourceData.publisher || typeof sourceData.publisher !== "string") {
-      console.log('error, invalid publisher', sourceData.publisher);
-      return res.status(400).json({ error: "Invalid publisher" });
-    }
-
-    if (!sourceData.source || typeof sourceData.source !== "string") {
-      console.log('error, invalid source', sourceData.source);
-      return res.status(400).json({ error: "Invalid source" });
-    }
-    const existingSource = await Source.findOne({ source: sourceData.source });
-    if (existingSource) {
-      console.log('error, source already exists', sourceData.source);
-      return res.status(400).json({ error: "Source already exists" });
-    }
-    if (typeof sourceData.year !== "string" || !/^\d{4}$/.test(sourceData.year)) {
-      console.log('error, invalid year', sourceData.year);
-      return res.status(400).json({ error: "Invalid year" });
-    }
-
-    if (
-      typeof sourceData.status !== "string"    
-    ) {
-      console.log('error, invalid status', sourceData.status);
-      return res.status(400).json({ error: "Invalid status" });
-    }
-
-    if (typeof sourceData.is_paid !== "boolean") {
-      console.log('error, invalid is_paid', sourceData.is_paid);
-      return res.status(400).json({ error: "Invalid payment status" });
-    }
-
-    if (!sourceData.source_type || typeof sourceData.source_type !== "string") {
-      console.log('error, invalid source_type', sourceData.source_type);
-      return res.status(400).json({ error: "Invalid source type" });
-    }
-
-    // Create a new Source instance and save it
-    const source = new Source(sourceData);
-    source.date_added = new Date();
-    source.date_modified = new Date();
-    await source.save();
-
-    res.status(201).json(source);
+    res.status(201).json({ message: "Sources created successfully", data: createdSources });
   } catch (error) {
-    if (error.name === "ValidationError") {
-      console.log('error', error);
-      return res.status(400).json({ error: error.message });
-    }
-    console.log('error', error);
-    res.status(400).json({ error: "Failed to create source" });
-    
+    console.error(error);
+    res.status(500).json({ error: "Failed to create sources" });
   }
 };
+
 
 exports.index = async (req, res) => {
   try {
