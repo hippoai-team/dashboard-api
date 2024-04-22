@@ -74,10 +74,10 @@ const newMasterSourceSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
-  date_added: {
+  timestamp: {
     type: Date,
-    default: Date.now
-  },
+    default: ""
+  }
 
 });
 

@@ -64,7 +64,7 @@ exports.index = async (req, res) => {
       const page = parseInt(req.query.page) || 1;
       const perPage = parseInt(req.query.perPage) || 10;
       const tab = parseInt(req.query.active_tab);
-
+      const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
       const skip = (page - 1) * perPage;
       const search = req.query.search || "";
       const sourceType = req.query.source_type || "";
@@ -117,14 +117,16 @@ exports.index = async (req, res) => {
       let sources, master_sources, total_source_counts;
       if (tab === 0) {
           const effectiveSourceType = sourceType || Object.keys(source_type_list)[0];
-          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage });
+          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage }).sort({ timestamp: sortOrder });
           total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
       } else {
-          master_sources = await newMasterSource.find(query, 'metadata processed id_', { skip, limit: perPage });
+          master_sources = await newMasterSource.find(query, 'metadata processed id_ timestamp', { skip, limit: perPage }).sort({ timestamp: sortOrder });
           master_sources = master_sources.map(doc => ({
               ...doc.metadata,
               processed: doc.processed,
-              _id: doc._id  // Adding the _id tag for checkbox filtering
+              _id: doc._id,
+              timestamp: doc.timestamp
+
           }));
           total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
       }
@@ -198,6 +200,7 @@ exports.update = async (req, res) => {
       for (const key in sourceData) {
         source_metadata[key] = sourceData[key];
       }
+      source_metadata.timestamp = new Date();
 
       updateResult = await source_metadata.save();
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
@@ -214,7 +217,9 @@ exports.update = async (req, res) => {
       for (const key in sourceData) {
         master_source_document.metadata[key] = sourceData[key];
       }
+      master_source_document.timestamp = new Date();
       master_source_document.markModified('metadata');
+
 
       updateResult = await master_source_document.save();
 
@@ -286,7 +291,7 @@ exports.approve = async (req, res) => {
           _id: new mongoose.Types.ObjectId(metadata._id),
           metadata: metadata,
           source_id: metadata._id,
-          date_added: new Date()
+          timestamp: new Date()
         });
         await masterSource.save();
         statusReport.push({
