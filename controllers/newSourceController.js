@@ -1,6 +1,16 @@
 // controllers/SourceController.js
 const axios = require('axios');
 const mongoose = require('mongoose');
+const AWS = require('aws-sdk');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+const S3Mapping = require('../models/S3Mapping');
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: 'us-east-1'
+});
+
 const { createNewSourceModel, createNewMasterSourceModel } = require('../models/NewSource');
 const clinical_guidelines_master = createNewSourceModel('clinical_guidelines_master');
 const review_articles_master = createNewSourceModel('review_articles_master');
@@ -17,44 +27,82 @@ const source_type_list = {
 
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
 const PIPELINE_API_URL = 'http://127.0.0.1:8000';
-exports.store = async (req, res) => {
-  const sources = req.body.sources; // Assuming sources is an array of source data
-  if (!sources || !Array.isArray(sources)) {
-    return res.status(400).send({ error: 'Invalid input' });
+const s3 = new AWS.S3();
+
+async function uploadFileToS3(fileBuffer, bucketName, key) {
+  const params = {
+    Bucket: bucketName,
+    Key: key,
+    Body: fileBuffer,
+  };
+
+  try {
+    const data = await s3.upload(params).promise();
+    return data.Location;
+  } catch (err) {
+    console.error('Error uploading file to S3:', err);
+    throw err;
   }
+}
+
+exports.store = async (req, res) => {
+    let sources;
+    try {
+      sources = JSON.parse(req.body.sources); // Parsing sources from JSON string in formData
+    } catch (parseError) {
+      return res.status(400).send({ error: 'Invalid JSON format for sources' });
+    }
+    const pdfFile = req.file; // Access file provided in the form field named 'pdfFile'
+
+    if (!sources || !Array.isArray(sources)) {
+      return res.status(400).send({ error: 'Invalid input' });
+    }
+
 
   let createdSources = [];
   let sourceActionStatus = [];
 
   for (const sourceData of sources) {
     try {
-      // Check if source URL already exists
       const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
       if (existingSource) {
         sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
-        continue; // Skip to the next sourceData if this URL already exists
+        continue;
       }
-
-      // Create a new source object
+  
       const id = new mongoose.Types.ObjectId();
       const newSource = new newMasterSource({
         _id: id,
-        metadata: { ...sourceData, source_id: id.toString() }, // Store all form data in metadata, including the mongoose id
+        metadata: { ...sourceData, source_id: id.toString() },
         source_id: id.toString()
       });
-
-      // Save to MongoDB
+  
+      if (pdfFile) {  // Check if there's a PDF file uploaded with the request
+        const fileKey = `all-pdfs/${id.toString()}.pdf`;  // Construct S3 key using the Mongo ID
+        const fileLocation = await uploadFileToS3(pdfFile.buffer, 'hippo-sources', fileKey);
+        console.log(fileLocation)
+  
+        // Save the mapping in MongoDB (assuming you have a model for this)
+        const mappingDoc = new S3Mapping({
+          _id: id,
+          mongodb_id: id.toString(),
+          s3_key: fileKey
+        });
+        await mappingDoc.save();
+      }
+  
       const createdSource = await newSource.save();
       createdSources.push(createdSource);
       sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
     } catch (error) {
       console.error(error);
-      sourceActionStatus.push({ source_url: sourceData.source_url, source_title:sourceData.title, status: 'error', error: error.message });
+      sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'error', error: error.message });
     }
   }
-
+  
   res.status(201).json({ createdSources, sourceActionStatus });
-};
+  
+}
 
 
 
@@ -184,10 +232,14 @@ exports.show = async (req, res) => {
 exports.update = async (req, res) => {
   const { sourceType, tab, id, ...sourceData } = req.body;
   let sourceActionStatus = [];
+
   try {
     let updateResult;
     let sourceTitle, sourceUrl;
+    let fileLocation;
+
     if (tab === '0') {
+      // Handle specific source types
       const source_metadata = await source_type_list[sourceType].findById(id);
       if (!source_metadata) {
         sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
@@ -197,20 +249,30 @@ exports.update = async (req, res) => {
       sourceTitle = source_metadata.title;
       sourceUrl = source_metadata.source_url;
 
+      // Update metadata fields
       for (const key in sourceData) {
         source_metadata[key] = sourceData[key];
       }
       source_metadata.timestamp = new Date();
 
+      // Handle file upload if new file is provided
+      if (req.file) {
+        const fileKey = `all-pdfs/${id}.pdf`;  // Re-use the existing S3 key or generate a new key strategy
+        fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
+        // Update file location in metadata if needed
+        source_metadata.fileLocation = fileLocation;
+      }
+
       updateResult = await source_metadata.save();
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
     } else if (tab === '1') {
+      // Similar logic for master sources
       const master_source_document = await newMasterSource.findById(id);
       if (!master_source_document) {
         sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
         return res.status(404).json({ error: "Master source not found", sourceActionStatus });
       }
-
+      console.log(master_source_document)
       sourceTitle = master_source_document.metadata.title;
       sourceUrl = master_source_document.metadata.source_url;
 
@@ -218,9 +280,15 @@ exports.update = async (req, res) => {
         master_source_document.metadata[key] = sourceData[key];
       }
       master_source_document.timestamp = new Date();
+
+      if (req.file) {
+        const fileKey = `all-pdfs/${id}.pdf`; // Different key or same key logic
+        fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
+        // Update file location in metadata
+        master_source_document.metadata.fileLocation = fileLocation;
+      }
+
       master_source_document.markModified('metadata');
-
-
       updateResult = await master_source_document.save();
 
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
@@ -238,6 +306,7 @@ exports.update = async (req, res) => {
     res.status(500).json({ error: "Failed to update source due to server error", sourceActionStatus });
   }
 };
+
 
 exports.destroy = async (req, res) => {
   try {
