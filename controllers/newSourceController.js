@@ -165,8 +165,19 @@ exports.index = async (req, res) => {
       let sources, master_sources, total_source_counts;
       if (tab === 0) {
           const effectiveSourceType = sourceType || Object.keys(source_type_list)[0];
-          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage }).sort({ timestamp: sortOrder });
+          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage }).sort({ timestamp: sortOrder }).lean();
+          sources = sources.map(source => {
+              let statusWithDetails = source.status;
+              if (source.reviewed_at) {
+                  statusWithDetails += ` on ${source.reviewed_at}`;
+              }
+              if (source.notes) {
+                  statusWithDetails += `\nReason: ${source.notes}`;
+              }
+              return { ...source, status: statusWithDetails };
+          });
           total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
+      
       } else {
           master_sources = await newMasterSource.find(query, 'metadata processed id_ timestamp', { skip, limit: perPage }).sort({ timestamp: sortOrder });
           master_sources = master_sources.map(doc => ({
@@ -385,7 +396,7 @@ exports.approve = async (req, res) => {
 };
 
 exports.reject = async (req, res) => {
-  const { sourceIds, sourceType } = req.body;
+  const { sourceIds, sourceType, rejectReason } = req.body;
   try {
     const sources_metadata = await source_type_list[sourceType].find({ _id: { $in: sourceIds } });
     if (sources_metadata.length !== sourceIds.length) {
@@ -396,12 +407,13 @@ exports.reject = async (req, res) => {
 
     for (const metadata of sources_metadata) {
       metadata.status = 'rejected';
+      metadata.notes = rejectReason;
       metadata.reviewed_at = new Date();
       await metadata.save();
       statusReport.push({
         url: metadata.source_url,
         title: metadata.title,
-        status: 'rejected',
+        status: 'rejected - ' + rejectReason,
         timestamp: new Date()
       });
     }

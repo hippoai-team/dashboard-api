@@ -28,7 +28,15 @@ const newSourceSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-});
+  notes: {
+    type: String,
+    required: false
+  },
+  reviewed_at: {
+    type: Date,
+    required: false
+  }
+  });
 const newMasterSourceSchema = new mongoose.Schema({
   _id: {
     type: mongoose.Schema.Types.ObjectId,
