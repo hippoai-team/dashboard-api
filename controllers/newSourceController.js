@@ -74,7 +74,8 @@ exports.store = async (req, res) => {
       const newSource = new newMasterSource({
         _id: id,
         metadata: { ...sourceData, source_id: id.toString() },
-        source_id: id.toString()
+        source_id: id.toString(),
+        timestamp: new Date()
       });
   
       if (pdfFile) {  // Check if there's a PDF file uploaded with the request
