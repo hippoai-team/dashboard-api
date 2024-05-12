@@ -75,7 +75,8 @@ exports.store = async (req, res) => {
         _id: id,
         metadata: { ...sourceData, source_id: id.toString() },
         source_id: id.toString(),
-        timestamp: new Date()
+        timestamp: new Date(),
+        status: 'active'
       });
   
       if (pdfFile) {  // Check if there's a PDF file uploaded with the request
@@ -180,14 +181,16 @@ exports.index = async (req, res) => {
           total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
       
       } else {
-          master_sources = await newMasterSource.find(query, 'metadata processed id_ timestamp', { skip, limit: perPage }).sort({ timestamp: sortOrder });
+          master_sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp', { skip, limit: perPage }).sort({ timestamp: sortOrder });
           master_sources = master_sources.map(doc => ({
               ...doc.metadata,
               processed: doc.processed,
               _id: doc._id,
-              timestamp: doc.timestamp
+              timestamp: doc.timestamp,
+              status: doc.status
 
           }));
+          console.log(master_sources)
           total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
       }
 
