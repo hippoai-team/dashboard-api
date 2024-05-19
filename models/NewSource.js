@@ -89,6 +89,29 @@ const newMasterSourceSchema = new mongoose.Schema({
 
 });
 
+const imageSourceSchema = {
+  type: mongoose.Schema({
+    _id: mongoose.Schema.Types.ObjectId,
+    source_id: {
+      type: String,
+      required: true
+    },
+    source_url: {
+      type: String,
+      required: true
+    },
+    processed: {
+      type: Boolean,
+      default: false
+    },
+    date_added: {
+      type: Date,
+      default: () => new Date()
+    }
+  })
+};
+
+
 function createNewSourceModel(collectionName) {
     return pendium_db.model('NewSource', newSourceSchema, collectionName);
   }
@@ -96,8 +119,13 @@ function createNewSourceModel(collectionName) {
   function createNewMasterSourceModel(collectionName) {
     return pendium_db.model('NewMasterSource', newMasterSourceSchema, collectionName);
   }
+
+  function createImageSourceModel(collectionName) {
+    return pendium_db.model('ImageSource', imageSourceSchema, collectionName);
+  }
   
 module.exports = {
     createNewSourceModel,
-    createNewMasterSourceModel
+    createNewMasterSourceModel,
+    createImageSourceModel
   };

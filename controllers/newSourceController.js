@@ -1,4 +1,3 @@
-// controllers/SourceController.js
 const axios = require('axios');
 const mongoose = require('mongoose');
 const AWS = require('aws-sdk');
@@ -11,22 +10,22 @@ AWS.config.update({
   region: 'us-east-1'
 });
 
-const { createNewSourceModel, createNewMasterSourceModel } = require('../models/NewSource');
+const { createNewSourceModel, createNewMasterSourceModel, createImageSourceModel } = require('../models/NewSource');
 const clinical_guidelines_master = createNewSourceModel('clinical_guidelines_master');
 const review_articles_master = createNewSourceModel('review_articles_master');
 const formulary_lists_master = createNewSourceModel('formulary_lists_master');
 const drug_monographs_master = createNewSourceModel('drug_monographs_master');
 const newMasterSource = createNewMasterSourceModel('master_sources');
+const imageSource = createImageSourceModel('master_image_sources');
 
 const source_type_list = {
-    'clinical_guidelines': clinical_guidelines_master,
-    'review_articles': review_articles_master,
-    'formulary_lists': formulary_lists_master,
-    'drug_monographs': drug_monographs_master
-}
+  'clinical_guidelines': clinical_guidelines_master,
+  'review_articles': review_articles_master,
+  'formulary_lists': formulary_lists_master,
+  'drug_monographs': drug_monographs_master,
+};
 
-//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://15.222.26.222:8080";
-const PIPELINE_API_URL = 'http://127.0.0.1:8000';
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://127.0.0.1:8000';
 const s3 = new AWS.S3();
 
 async function uploadFileToS3(fileBuffer, bucketName, key) {
@@ -45,200 +44,205 @@ async function uploadFileToS3(fileBuffer, bucketName, key) {
   }
 }
 
-exports.store = async (req, res) => {
-    let sources;
-    try {
-      sources = JSON.parse(req.body.sources); // Parsing sources from JSON string in formData
-    } catch (parseError) {
-      return res.status(400).send({ error: 'Invalid JSON format for sources' });
-    }
-    const pdfFile = req.file; // Access file provided in the form field named 'pdfFile'
+function buildQuery(tab, search, sourceType, status, orConditions) {
+  let query = {};
 
-    if (!sources || !Array.isArray(sources)) {
-      return res.status(400).send({ error: 'Invalid input' });
-    }
-
-
-  let createdSources = [];
-  let sourceActionStatus = [];
-
-  for (const sourceData of sources) {
-    try {
-      const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
-      if (existingSource) {
-        sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
-        continue;
+  if (tab === 0) {
+    query.source_type = sourceType || Object.keys(source_type_list)[0];
+    if (status) {
+      if (status === 'pending') {
+        query.$and = [
+          ...orConditions,
+          { $or: [{ status: { $exists: false } }, { status: 'pending' }] }
+        ];
+      } else {
+        query.$and = [
+          ...orConditions,
+          { status: status }
+        ];
       }
-  
-      const id = new mongoose.Types.ObjectId();
-      const newSource = new newMasterSource({
-        _id: id,
-        metadata: { ...sourceData, source_id: id.toString() },
-        source_id: id.toString(),
-        timestamp: new Date(),
-        status: 'active'
-      });
-  
-      if (pdfFile) {  // Check if there's a PDF file uploaded with the request
-        const fileKey = `all-pdfs/${id.toString()}.pdf`;  // Construct S3 key using the Mongo ID
-        const fileLocation = await uploadFileToS3(pdfFile.buffer, 'hippo-sources', fileKey);
-        console.log(fileLocation)
-  
-        // Save the mapping in MongoDB (assuming you have a model for this)
-        const mappingDoc = new S3Mapping({
-          _id: id,
-          mongodb_id: id.toString(),
-          s3_key: fileKey
-        });
-        await mappingDoc.save();
+    } else {
+      query.$and = [
+        ...orConditions,
+        { $or: [{ status: { $exists: false } }, { status: 'pending' }] }
+      ];
+    }
+  } else {
+    if (sourceType) {
+      query['metadata.source_type'] = sourceType;
+    }
+    if (status) {
+      if (status === 'processed') {
+        query.processed = true;
+      } else {
+        query.status = status;
+        query.processed = false;
       }
-  
-      const createdSource = await newSource.save();
-      createdSources.push(createdSource);
-      sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
-    } catch (error) {
-      console.error(error);
-      sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'error', error: error.message });
     }
   }
+
+  return query;
+}
+
+async function handleSourcesTab(query, skip, limit, sortOrder) {
+  const effectiveSourceType = query.source_type;
+  const sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit })
+    .sort({ timestamp: sortOrder }).lean();
+  const total_source_counts = await source_type_list[effectiveSourceType].countDocuments(query) 
   
-  res.status(201).json({ createdSources, sourceActionStatus });
+  return { sources, total_source_counts };
+}
+
+async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
+  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp', { skip, limit })
+    .sort({ timestamp: sortOrder });
+    sources = sources.map(doc => ({
+      ...doc.metadata,
+      processed: doc.processed,
+      _id: doc._id,
+      timestamp: doc.timestamp,
+      status: doc.status
+    }));
+  const total_source_counts =  await newMasterSource.countDocuments(query) 
   
+  return { sources, total_source_counts };
+}
+
+async function handleImageSourcesTab(query, skip, limit, sortOrder) {
+  const sources = await imageSource.find(query, null, { skip, limit })
+    .sort({ timestamp: sortOrder }).lean();
+  const total_source_counts = await imageSource.countDocuments(query) 
+  return { sources, total_source_counts };
 }
 
 
-
-
-exports.index = async (req, res) => {
+exports.store = async (req, res) => {
   try {
-      const page = parseInt(req.query.page) || 1;
-      const perPage = parseInt(req.query.perPage) || 10;
-      const tab = parseInt(req.query.active_tab);
-      const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
-      const skip = (page - 1) * perPage;
-      const search = req.query.search || "";
-      const sourceType = req.query.source_type || "";
-      const status = req.query.status || "";
-      let query = {};
+    const sources = JSON.parse(req.body.sources); // Parsing sources from JSON string in formData
+    const pdfFile = req.file; // Access file provided in the form field named 'pdfFile'
 
-      // Universal search setup, adjusting fields based on active tab
-      const baseSearch = { $regex: search, $options: "i" };
-      const searchQueries = tab === 1 ? [
-          { 'metadata.title': baseSearch },
-          { 'metadata.publisher': baseSearch },
-          { 'metadata.subspecialty': baseSearch }
-      ] : [
-          { title: baseSearch },
-          { publisher: baseSearch },
-          { subspecialty: baseSearch }
-      ];
+    if (!Array.isArray(sources)) {
+      return res.status(400).send({ error: 'Invalid input' });
+    }
 
-      if (search) {
-          query.$or = searchQueries;
-      }
+    let createdSources = [];
+    let sourceActionStatus = [];
 
-      // Filtering by source type and status
-      if (tab === 0) {
-          query.source_type = sourceType || Object.keys(source_type_list)[0];
-          if (status) {
-              if (status === 'pending') {
-                  query.$or = [{ status: { $exists: false } }, { status: 'pending' }];
-              } else {
-                  query.status = status;
-              }
-          } else {
-              query.$or = [{ status: { $exists: false } }, { status: 'pending' }];
-          }
-      } else {
-          if (sourceType) {
-              query['metadata.source_type'] = sourceType;
-          }
-          if (status) {
-              if (status === 'processed') {
-                  query.processed = true;
-              } else {
-                  query.status = status;
-                  query.processed = false;
-              }
-          }
-      }
+    for (const sourceData of sources) {
+      try {
+        const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
+        if (existingSource) {
+          sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
+          continue;
+        }
 
-      // Fetching data based on tab selection
-      let sources, master_sources, total_source_counts;
-      if (tab === 0) {
-          const effectiveSourceType = sourceType || Object.keys(source_type_list)[0];
-          sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit: perPage }).sort({ timestamp: sortOrder }).lean();
-          sources = sources.map(source => {
-              let statusWithDetails = source.status;
-              if (source.reviewed_at) {
-                  statusWithDetails += ` on ${source.reviewed_at}`;
-              }
-              if (source.notes) {
-                  statusWithDetails += `\nReason: ${source.notes}`;
-              }
-              return { ...source, status: statusWithDetails };
+        const id = new mongoose.Types.ObjectId();
+        const newSource = new newMasterSource({
+          _id: id,
+          metadata: { ...sourceData, source_id: id.toString() },
+          source_id: id.toString(),
+          timestamp: new Date(),
+          status: 'active'
+        });
+
+        if (pdfFile) {  // Check if there's a PDF file uploaded with the request
+          const fileKey = `all-pdfs/${id.toString()}.pdf`;  // Construct S3 key using the Mongo ID
+          const fileLocation = await uploadFileToS3(pdfFile.buffer, 'hippo-sources', fileKey);
+          console.log(fileLocation);
+
+          // Save the mapping in MongoDB (assuming you have a model for this)
+          const mappingDoc = new S3Mapping({
+            _id: id,
+            mongodb_id: id.toString(),
+            s3_key: fileKey
           });
-          total_source_counts = { sources: await source_type_list[effectiveSourceType].countDocuments(query) };
-      
-      } else {
-          master_sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp', { skip, limit: perPage }).sort({ timestamp: sortOrder });
-          master_sources = master_sources.map(doc => ({
-              ...doc.metadata,
-              processed: doc.processed,
-              _id: doc._id,
-              timestamp: doc.timestamp,
-              status: doc.status
+          await mappingDoc.save();
+        }
 
-          }));
-          console.log(master_sources)
-          total_source_counts = { master_sources: await newMasterSource.countDocuments(query) };
+        const createdSource = await newSource.save();
+        createdSources.push(createdSource);
+        sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
+      } catch (error) {
+        console.error(error);
+        sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'error', error: error.message });
       }
+    }
 
-      // Constructing the response data structure
-      const data = {
-          sources: tab === 0 ? sources : [],
-          master_sources: tab === 1 ? master_sources : [],
-          source_types: Object.keys(source_type_list),
-          total_source_counts
-      };
-
-      res.json(data);
+    res.status(201).json({ createdSources, sourceActionStatus });
   } catch (error) {
-      console.error("Error in fetching sources:", error);
-      res.status(500).json({ error: "Failed to fetch sources due to server error" });
+    console.error("Error in store function:", error);
+    res.status(500).json({ error: "Failed to store sources due to server error" });
   }
 };
 
-  
+exports.index = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 10;
+    const tab = parseInt(req.query.active_tab);
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+    const skip = (page - 1) * perPage;
+    const search = req.query.search || "";
+    const sourceType = req.query.source_type || "";
+    const status = req.query.status || "";
+    
+    const baseSearch = { $regex: search, $options: "i" };
+    const searchQueries = tab === 1 ? [
+      { 'metadata.title': baseSearch },
+      { 'metadata.publisher': baseSearch },
+      { 'metadata.subspecialty': baseSearch }
+    ] : [
+      { title: baseSearch },
+      { publisher: baseSearch },
+      { subspecialty: baseSearch }
+    ];
 
-
+    const orConditions = search ? [{ $or: searchQueries }] : [];
+    const query = buildQuery(tab, search, sourceType, status, orConditions);
+    let responseData;
+    switch (tab) {
+      case 0:
+        responseData = await handleSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      case 1:
+        responseData = await handleMasterSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      case 2:
+        responseData = await handleImageSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      default:
+        throw new Error("Invalid tab selection");
+    }
+    res.json({
+      ...responseData,
+      source_types: Object.keys(source_type_list),
+    });
+  } catch (error) {
+    console.error("Error in index function:", error);
+    res.status(500).json({ error: "Failed to fetch sources due to server error" });
+  }
+};
 
 exports.show = async (req, res) => {
   try {
     const { id } = req.params;
     const { tab, sourceTypeFilter } = req.query;
     let sourceModel;
-    let responseData;
 
     if (tab === '0') {
       sourceModel = source_type_list[sourceTypeFilter];
-      const source = await sourceModel.findById(id);
-      if (!source) {
-        return res.status(404).json({ error: "Source not found" });
-      }
-      responseData = source;
     } else if (tab === '1') {
       sourceModel = newMasterSource;
-      const source = await sourceModel.findById(id);
-      if (!source) {
-        return res.status(404).json({ error: "Source not found" });
-      }
-      responseData = source.metadata;
     } else {
       return res.status(400).json({ error: "Invalid tab selection" });
     }
 
-    res.json(responseData);
+    const source = await sourceModel.findById(id);
+    if (!source) {
+      return res.status(404).json({ error: "Source not found" });
+    }
+
+    res.json(tab === '0' ? source : source.metadata);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch source" });
   }
@@ -254,7 +258,6 @@ exports.update = async (req, res) => {
     let fileLocation;
 
     if (tab === '0') {
-      // Handle specific source types
       const source_metadata = await source_type_list[sourceType].findById(id);
       if (!source_metadata) {
         sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
@@ -264,30 +267,26 @@ exports.update = async (req, res) => {
       sourceTitle = source_metadata.title;
       sourceUrl = source_metadata.source_url;
 
-      // Update metadata fields
       for (const key in sourceData) {
         source_metadata[key] = sourceData[key];
       }
       source_metadata.timestamp = new Date();
 
-      // Handle file upload if new file is provided
       if (req.file) {
-        const fileKey = `all-pdfs/${id}.pdf`;  // Re-use the existing S3 key or generate a new key strategy
+        const fileKey = `all-pdfs/${id}.pdf`;
         fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
-        // Update file location in metadata if needed
         source_metadata.fileLocation = fileLocation;
       }
 
       updateResult = await source_metadata.save();
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
     } else if (tab === '1') {
-      // Similar logic for master sources
       const master_source_document = await newMasterSource.findById(id);
       if (!master_source_document) {
         sourceActionStatus.push({ source_title: "", source_url: "", status: 'not_found' });
         return res.status(404).json({ error: "Master source not found", sourceActionStatus });
       }
-      console.log(master_source_document)
+
       sourceTitle = master_source_document.metadata.title;
       sourceUrl = master_source_document.metadata.source_url;
 
@@ -297,15 +296,13 @@ exports.update = async (req, res) => {
       master_source_document.timestamp = new Date();
 
       if (req.file) {
-        const fileKey = `all-pdfs/${id}.pdf`; // Different key or same key logic
+        const fileKey = `all-pdfs/${id}.pdf`;
         fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
-        // Update file location in metadata
         master_source_document.metadata.fileLocation = fileLocation;
       }
 
       master_source_document.markModified('metadata');
       updateResult = await master_source_document.save();
-
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
     } else {
       sourceActionStatus.push({ source_title: "", source_url: "", status: 'invalid_tab' });
@@ -322,24 +319,21 @@ exports.update = async (req, res) => {
   }
 };
 
-
 exports.destroy = async (req, res) => {
   try {
-    const id = req.params.id; 
+    const id = req.params.id;
     const title = await Source.findOne({ _id: id }, { title: 1, _id: 0 });
 
     await Source.updateOne({ _id: req.params.id }, { status: 'remove' });
     
-    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids:[id] });
+    const response = await axios.post(`${PIPELINE_API_URL}/process_ids`, { ids: [id] });
     console.log(response.data);
     
     res.status(200).send('Source soft deleted successfully');
-
   } catch (error) {
-      res.status(500).send('Server error');
+    res.status(500).send('Server error');
   }
-  }
-
+};
 
 exports.approve = async (req, res) => {
   const { sourceIds, sourceType } = req.body;
@@ -430,15 +424,26 @@ exports.reject = async (req, res) => {
     res.status(200).json({ statusReport });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to reject source(s)" });
-  }
+    res.status(500).json({ error: "Failed to reject sources" });
+}
+
 };
 
 exports.process = async (req, res) => {
   const { sourceIds } = req.body;
-  console.log(sourceIds)
   try {
-    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, { document_ids: sourceIds });
+    const response = await axios.post(`${PIPELINE_API_URL}/ingest`, sourceIds );
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.process_image = async (req, res) => {
+  const { sourceIds } = req.body;
+  try {
+    const response = await axios.post(`${PIPELINE_API_URL}/images/process/`, sourceIds);
     res.status(200).json(response.data);
   } catch (error) {
     console.error(error);
@@ -446,11 +451,8 @@ exports.process = async (req, res) => {
   }
 }
 
-
 exports.delete = async (req, res) => {
-  
   const { sourceIds } = req.body;
-  console.log(sourceIds)
   try {
     const response = await axios.post(`${PIPELINE_API_URL}/delete`, { document_ids: sourceIds });
     res.status(200).json({ message: "Source deleted successfully", data: response.data });
@@ -460,7 +462,16 @@ exports.delete = async (req, res) => {
   }
 };
 
-
+exports.delete_images = async (req, res) => {
+  const { sourceIds } = req.body;
+  try {
+    const response = await imageSource.deleteMany({ _id: { $in: sourceIds } });
+    res.status(200).json({ message: "Image source deleted successfully", data: response.data });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to delete image source" });
+  }
+};
 
 exports.getPipelineStatus = async (req, res) => {
   try {
@@ -474,4 +485,4 @@ exports.getPipelineStatus = async (req, res) => {
       res.status(500).json({ error: "Failed to get pipeline status" });
     }
   }
-}
+};

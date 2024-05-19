@@ -10,6 +10,8 @@ router.get('/:id', newSourceController.show);
 router.put('/edit/:id', newSourceController.update);
 router.post('/approve', newSourceController.approve);
 router.post('/process', newSourceController.process);
+router.post('/process-images', newSourceController.process_image);
+router.post('/delete-images', newSourceController.delete_images);
 router.post('/status', newSourceController.getPipelineStatus);
 router.post('/reject', newSourceController.reject);
 router.post('/delete', newSourceController.delete);
