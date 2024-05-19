@@ -79,6 +79,9 @@ function buildQuery(tab, search, sourceType, status, orConditions) {
         query.processed = false;
       }
     }
+    else {
+      query.processed = false;
+    }
   }
 
   return query;
@@ -94,15 +97,16 @@ async function handleSourcesTab(query, skip, limit, sortOrder) {
 }
 
 async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
-  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp', { skip, limit })
+  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes', { skip, limit })
     .sort({ timestamp: sortOrder });
-    sources = sources.map(doc => ({
-      ...doc.metadata,
-      processed: doc.processed,
-      _id: doc._id,
-      timestamp: doc.timestamp,
-      status: doc.status
-    }));
+  sources = sources.map(doc => ({
+    ...doc.metadata,
+    processed: doc.processed,
+    _id: doc._id,
+    timestamp: doc.timestamp,
+    status: doc.status,
+    nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`) // Extracting text from each node, prepending with source number, and appending to the sources array
+  }));
   const total_source_counts =  await newMasterSource.countDocuments(query) 
   
   return { sources, total_source_counts };
@@ -465,8 +469,8 @@ exports.delete = async (req, res) => {
 exports.delete_images = async (req, res) => {
   const { sourceIds } = req.body;
   try {
-    const response = await imageSource.deleteMany({ _id: { $in: sourceIds } });
-    res.status(200).json({ message: "Image source deleted successfully", data: response.data });
+    const response = await imageSource.updateMany({ _id: { $in: sourceIds } }, { $set: { status: 'rejected' } });
+    res.status(200).json({ message: "Image source marked as rejected successfully", data: response });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to delete image source" });

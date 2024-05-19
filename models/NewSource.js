@@ -100,6 +100,10 @@ const imageSourceSchema = {
       type: String,
       required: true
     },
+    source_type: {
+      type: String,
+      required: true
+    },
     processed: {
       type: Boolean,
       default: false
