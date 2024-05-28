@@ -253,14 +253,13 @@ exports.show = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-  const { sourceType, tab, id, ...sourceData } = req.body;
+  const { sourceType, tab, id } = req.body;
+  const sourceData = JSON.parse(req.body.sources)[0];
   let sourceActionStatus = [];
-
   try {
     let updateResult;
     let sourceTitle, sourceUrl;
     let fileLocation;
-
     if (tab === '0') {
       const source_metadata = await source_type_list[sourceType].findById(id);
       if (!source_metadata) {
@@ -281,7 +280,7 @@ exports.update = async (req, res) => {
         fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
         source_metadata.fileLocation = fileLocation;
       }
-
+  
       updateResult = await source_metadata.save();
       sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'updated' });
     } else if (tab === '1') {
@@ -318,7 +317,7 @@ exports.update = async (req, res) => {
     }
   } catch (error) {
     console.error("Error updating source:", error);
-    sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'error', error: error.message });
+    //sourceActionStatus.push({ source_title: sourceTitle, source_url: sourceUrl, status: 'error', error: error.message });
     res.status(500).json({ error: "Failed to update source due to server error", sourceActionStatus });
   }
 };
