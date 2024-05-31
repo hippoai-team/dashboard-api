@@ -90,9 +90,22 @@ const newMasterSourceSchema = new mongoose.Schema({
 });
 
 const imageSourceSchema = {
-  type: mongoose.Schema({
-    _id: mongoose.Schema.Types.ObjectId,
+  _id: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: function () {
+      return new mongoose.Types.ObjectId();
+    },
+    required: true
+  },
     source_id: {
+      type: String,
+      required: true
+    },
+    title: {
+      type: String,
+      required: true
+    },
+    status: {
       type: String,
       required: true
     },
@@ -112,8 +125,8 @@ const imageSourceSchema = {
       type: Date,
       default: () => new Date()
     }
-  })
-};
+  };
+
 
 
 function createNewSourceModel(collectionName) {

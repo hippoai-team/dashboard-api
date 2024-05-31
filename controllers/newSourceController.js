@@ -1,5 +1,6 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
+
 const AWS = require('aws-sdk');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -46,7 +47,6 @@ async function uploadFileToS3(fileBuffer, bucketName, key) {
 
 function buildQuery(tab, search, sourceType, status, orConditions) {
   let query = {};
-
   if (tab === 0) {
     query.source_type = sourceType || Object.keys(source_type_list)[0];
     if (status) {
@@ -189,7 +189,6 @@ exports.index = async (req, res) => {
     const search = req.query.search || "";
     const sourceType = req.query.source_type || "";
     const status = req.query.status || "";
-    
     const baseSearch = { $regex: search, $options: "i" };
     const searchQueries = tab === 1 ? [
       { 'metadata.title': baseSearch },
@@ -468,11 +467,17 @@ exports.delete = async (req, res) => {
 exports.delete_images = async (req, res) => {
   const { sourceIds } = req.body;
   try {
-    const response = await imageSource.updateMany({ _id: { $in: sourceIds } }, { $set: { status: 'rejected' } });
-    res.status(200).json({ message: "Image source marked as rejected successfully", data: response });
+    const sources = await imageSource.find({ _id: { $in: sourceIds } });
+    for (const source of sources) {
+      source['status'] = 'inactive';
+      await source.save();
+    }
+    
+    
+    res.status(200).json({ message: "Images status updated to 'rejected' successfully." });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to delete image source" });
+    res.status(500).json({ error: "Failed to update image status" });
   }
 };
 
