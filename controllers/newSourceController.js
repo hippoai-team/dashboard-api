@@ -1,6 +1,6 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
-
+const Image = require('image-js').Image;
 const AWS = require('aws-sdk');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -41,6 +41,23 @@ async function uploadFileToS3(fileBuffer, bucketName, key) {
     return data.Location;
   } catch (err) {
     console.error('Error uploading file to S3:', err);
+    throw err;
+  }
+}
+
+async function uploadImageToS3(imageBuffer, bucketName, key, contentType) {
+  const params = {
+    Bucket: bucketName,
+    Key: key,
+    Body: imageBuffer,
+    ContentType: contentType,
+  };
+
+  try {
+    const data = await s3.upload(params).promise();
+    return data.Location;
+  } catch (err) {
+    console.error('Error uploading image to S3:', err);
     throw err;
   }
 }
@@ -97,7 +114,7 @@ async function handleSourcesTab(query, skip, limit, sortOrder) {
 }
 
 async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
-  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes', { skip, limit })
+  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes images', { skip, limit })
     .sort({ timestamp: sortOrder });
   sources = sources.map(doc => ({
     ...doc.metadata,
@@ -105,7 +122,12 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
     _id: doc._id,
     timestamp: doc.timestamp,
     status: doc.status,
-    nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`) // Extracting text from each node, prepending with source number, and appending to the sources array
+    nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`), // Extracting text from each node, prepending with source number, and appending to the sources array
+    images: doc.images.filter(img => img.processed).map(img => ({
+      title: img.image_title,
+      description: img.image_description,
+      sourceUrl: img.source_url
+    })) // Filtering images where processed is true, then creating an object with title, description, and sourceUrl for each image
   }));
   const total_source_counts =  await newMasterSource.countDocuments(query) 
   
@@ -123,7 +145,7 @@ async function handleImageSourcesTab(query, skip, limit, sortOrder) {
 exports.store = async (req, res) => {
   try {
     const sources = JSON.parse(req.body.sources); // Parsing sources from JSON string in formData
-    const pdfFile = req.file; // Access file provided in the form field named 'pdfFile'
+    const file = req.file; // Access file provided in the form field named 'file'
 
     if (!Array.isArray(sources)) {
       return res.status(400).send({ error: 'Invalid input' });
@@ -131,41 +153,77 @@ exports.store = async (req, res) => {
 
     let createdSources = [];
     let sourceActionStatus = [];
-
     for (const sourceData of sources) {
       try {
-        const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
-        if (existingSource) {
-          sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
-          continue;
-        }
-
         const id = new mongoose.Types.ObjectId();
-        const newSource = new newMasterSource({
-          _id: id,
-          metadata: { ...sourceData, source_id: id.toString() },
-          source_id: id.toString(),
-          timestamp: new Date(),
-          status: 'active'
-        });
 
-        if (pdfFile) {  // Check if there's a PDF file uploaded with the request
-          const fileKey = `all-pdfs/${id.toString()}.pdf`;  // Construct S3 key using the Mongo ID
-          const fileLocation = await uploadFileToS3(pdfFile.buffer, 'hippo-sources', fileKey);
-          console.log(fileLocation);
+        if (sourceData.load_type === 'image') {
+          let file_extension;
+          let contentType;
+          if (file.buffer instanceof Buffer) {
+              const image_stream = new Image();
+              image_stream.src = file.buffer;
+              file_extension = 'jpeg';
+              contentType = 'image/jpeg';
+          } else {
+              file_extension = file.originalname.split(".").pop();
+              if (file_extension === "jpeg") {
+                  contentType = "image/jpeg";
+              } else if (file_extension === "png") {
+                  contentType = "image/png";
+              } else {
+                  contentType = "binary/octet-stream";
+              }
+          }
+          const fileKey = `extracted_images/${id.toString()}.${file_extension}`;
 
-          // Save the mapping in MongoDB (assuming you have a model for this)
-          const mappingDoc = new S3Mapping({
+          const fileLocation = await uploadImageToS3(file.buffer, 'pendium-images', fileKey, contentType);
+
+          const newImageSource = new imageSource({
             _id: id,
-            mongodb_id: id.toString(),
-            s3_key: fileKey
+            source_id: id.toString(),
+            title: sourceData.title,
+            status: 'active',
+            source_url: fileLocation,
+            source_type: sourceData.source_type,
+            processed: false,
+            date_added: new Date()
           });
-          await mappingDoc.save();
-        }
 
-        const createdSource = await newSource.save();
-        createdSources.push(createdSource);
-        sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
+          const createdImageSource = await newImageSource.save();
+          createdSources.push(createdImageSource);
+          sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created', type: 'image' });
+        } else {
+          const existingSource = await newMasterSource.findOne({ 'metadata.source_url': sourceData.source_url });
+          if (existingSource) {
+            sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'exists' });
+            continue;
+          }
+
+          const newSource = new newMasterSource({
+            _id: id,
+            metadata: { ...sourceData, source_id: id.toString() },
+            source_id: id.toString(),
+            timestamp: new Date(),
+            status: 'active'
+          });
+
+          if (file) {
+            const fileKey = `all-pdfs/${id.toString()}.pdf`;
+            const fileLocation = await uploadFileToS3(file.buffer, 'hippo-sources', fileKey);
+
+            const mappingDoc = new S3Mapping({
+              _id: id,
+              mongodb_id: id.toString(),
+              s3_key: fileKey
+            });
+            await mappingDoc.save();
+          }
+
+          const createdSource = await newSource.save();
+          createdSources.push(createdSource);
+          sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'created' });
+        }
       } catch (error) {
         console.error(error);
         sourceActionStatus.push({ source_url: sourceData.source_url, source_title: sourceData.title, status: 'error', error: error.message });

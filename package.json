@@ -21,6 +21,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.17.1",
     "googleapis": "^127.0.0",
+    "image-js": "^0.35.5",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.43",

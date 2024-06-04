@@ -61,6 +61,10 @@ const newMasterSourceSchema = new mongoose.Schema({
     type: Array,
     default: []
   },
+  images: {
+    type: Array,
+    default: []
+  },
   status: {
     type: String,
     default: "active",
