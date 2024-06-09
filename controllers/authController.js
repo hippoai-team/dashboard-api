@@ -15,7 +15,7 @@ const loginController = async (req, res) => {
             })
         }
         // check user
-        const user = await userModel.findOne({ email, permissions: { $in: ['admin'] } }).maxTimeMS(15000);
+        const user = await userModel.findOne({ email, role: 'admin' }).maxTimeMS(15000);
         if (!user) {
             return res.status(404).send({
                 success: false,
