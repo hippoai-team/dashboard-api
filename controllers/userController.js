@@ -61,7 +61,7 @@ exports.index = async (req, res) => {
     
     const dateRangeFilter = req.query.dateRange || "last_week";
     const totalUsers = await User.countDocuments(query); // Count the total number of users
-    const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
+   /* const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
     const dailyActiveUsers = {};
     const dateRangeStart = req.query.dateRangeStart || "";
     const dateRangeEnd = req.query.dateRangeEnd || "";
@@ -109,35 +109,35 @@ exports.index = async (req, res) => {
         weeklyActiveUsers[week] = {count: weeklyActiveUsers[week].size, users: Array.from(weeklyActiveUsers[week])};
     }
     const weeklyActiveUsersDescription = `Active users per week and change for previous week for cohort:'${req.query.userGroupFilter}' in the ${dateRangeFilter}.`;
-
+*/
     //sum usage field from all users in query
-    const totalUsage = await User.aggregate([
+  /*  const totalUsage = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $add: ["$usage", "$follow_up_usage"] } } } }
       ]).allowDiskUse(true);
     const totalUsageDescription = `The total usage for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalUsage[0].total}.`;
     const totalUsageCount = totalUsage.length ? totalUsage[0].total : 0;
-
-    const totalFeedback = await User.aggregate([
+*/
+    /*const totalFeedback = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: "$feedback_count" } } }
       ]).allowDiskUse(true);
     const totalFeedbackDescription = `The total feedback for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalFeedback[0].total}.`;
     const totalFeedbackCount = totalFeedback.length ? totalFeedback[0].total : 0;
-
+*/
 
     //preset range filter
 
-   const { totalChurnRate, churnPerWeek, churnDescription,inactiveUsers } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
-    const churnData = {
+   //const { totalChurnRate, churnPerWeek, churnDescription,inactiveUsers } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
+   /* const churnData = {
         totalChurnRate,
         churnPerWeek,
         inactiveUsers
-    };
-    const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
+    };*/
+    //const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
     //send back data
  
-    const savedSources = await User.aggregate([
+    /*const savedSources = await User.aggregate([
         { $match: query },
         { $group: { _id: null, total: { $sum: { $cond: { if: { $isArray: "$sources" }, then: { $size: "$sources" }, else: 0 } } } } }
       ]).allowDiskUse(true);
@@ -152,7 +152,7 @@ exports.index = async (req, res) => {
         { $group: { _id: null, total: { $sum: { $ifNull: ["$follow_up_usage", 0] } } } }
 
     ]).allowDiskUse(true);
-    const totalFollowUpCount = followUpCount.length ? followUpCount[0].total : 0;
+    const totalFollowUpCount = followUpCount.length ? followUpCount[0].total : 0;*/
 
     const users = await User.aggregate([
       { $match: query },
@@ -173,79 +173,34 @@ exports.index = async (req, res) => {
           nav_threads: 1,
           nav_saved_sources: 1,
           num_logins: 1,
-          threadCount: { $size: "$threads" },
-          sourcesCount: { $size: "$sources" },
           sources: 1 // Include sources array for further processing
         }
-      },
-      { $unwind: { path: "$sources", preserveNullAndEmptyArrays: true } },
-      { $group: {
-          _id: { userId: "$_id", sourceType: "$sources.source_type" },
-          count: { $sum: 1 },
-          // Add user document to each group to preserve threadCount and sourcesCount
-          user_doc: { $first: "$$ROOT" }
-      }},
-      { $group: {
-          _id: "$_id.userId",
-          sourceCountType: {
-            $push: {
-              type: "$_id.sourceType",
-              count: "$count"
-            }
-          },
-          // Take the user document from the previous stage to preserve threadCount and sourcesCount
-          user_doc: { $first: "$user_doc" }
-      }},
-      {
-        $replaceRoot: { // Replace the root to clean up the structure
-          newRoot: {
-            $mergeObjects: ["$user_doc", { sourceCountType: "$sourceCountType" }]
-          }
-        }
       }
-    ]).allowDiskUse(true);
-    
-    const savedSourceTypeCounts = {};
-    users.forEach(user => {
-      if (user.sourceCountType) {
-        user.sourceCountType.forEach(sourceTypeCount => {
-          if (sourceTypeCount && sourceTypeCount.type) {
-            if (savedSourceTypeCounts[sourceTypeCount.type]) {
-              savedSourceTypeCounts[sourceTypeCount.type] += sourceTypeCount.count;
-            } else {
-              savedSourceTypeCounts[sourceTypeCount.type] = sourceTypeCount.count;
-            }
-          }
-        });
-      }
-    });
-console.log(savedSourceTypeCounts);
-
-      
-    const descriptions = {
+    ]);
+    /*const descriptions = {
         dailyActiveUsersDescription,
         weeklyActiveUsersDescription,
         totalUsageDescription,
         totalFeedbackDescription,
         weeklyTurnOverRateDescription,
         churnDescription
-    };
+    };*/
 
     const data = {
         users,
         totalUsers,
-        totalUsageCount,
-        totalFeedbackCount,
-        dailyActiveUsers,
-        weeklyActiveUsers,
-        churnData,
-        queriesByUserAndWeek,
-        weekOverWeekChanges,
-        descriptions,
-        totalSavedSources,
-        totalClickedSources,
-        totalFollowUpCount,
-        savedSourceTypeCounts
+        //totalUsageCount,
+        //totalFeedbackCount,
+        //dailyActiveUsers,
+        //weeklyActiveUsers,
+        //churnData,
+        //queriesByUserAndWeek,
+        //weekOverWeekChanges,
+        //descriptions,
+       // totalSavedSources,
+        //totalClickedSources,
+       // totalFollowUpCount,
+       // savedSourceTypeCounts
 
     };
     res.status(200).json(data);
