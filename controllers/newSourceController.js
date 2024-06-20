@@ -1,14 +1,17 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
 const Image = require('image-js').Image;
-const AWS = require('aws-sdk');
+
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const S3Mapping = require('../models/S3Mapping');
-AWS.config.update({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: 'us-east-1'
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const s3Client = new S3Client({
+  region: 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
 });
 
 const { createNewSourceModel, createNewMasterSourceModel, createImageSourceModel } = require('../models/NewSource');
@@ -27,7 +30,7 @@ const source_type_list = {
 };
 
 const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
-const s3 = new AWS.S3();
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000';
 
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
@@ -37,8 +40,8 @@ async function uploadFileToS3(fileBuffer, bucketName, key) {
   };
 
   try {
-    const data = await s3.upload(params).promise();
-    return data.Location;
+    const data = await s3Client.send(new PutObjectCommand(params));
+    return `https://${bucketName}.s3.amazonaws.com/${key}`;
   } catch (err) {
     console.error('Error uploading file to S3:', err);
     throw err;
@@ -54,8 +57,8 @@ async function uploadImageToS3(imageBuffer, bucketName, key, contentType) {
   };
 
   try {
-    const data = await s3.upload(params).promise();
-    return data.Location;
+    const data = await s3Client.send(new PutObjectCommand(params));
+    return `https://${bucketName}.s3.amazonaws.com/${key}`;
   } catch (err) {
     console.error('Error uploading image to S3:', err);
     throw err;

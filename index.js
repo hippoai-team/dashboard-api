@@ -12,6 +12,8 @@ const chatLogRoutes = require("./api/chatLogRoutes");
 const userRoutes = require("./api/userRoutes");
 const usageRoutes = require("./api/usageRoutes");
 const newSourceRoutes = require("./api/newSourceRoutes");
+const ec2Routes = require("./api/ec2Routes");
+
 // middlewares
 app.use(express.json({ extended: false }));
 app.use(cors());
@@ -40,6 +42,7 @@ app.use('/api/chatlogs', chatLogRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/usage', usageRoutes)
 app.use('/api/master-sources', newSourceRoutes)
+app.use('/api/pipeline', ec2Routes)
 
 app.use('/admin', authRoutes);
 
