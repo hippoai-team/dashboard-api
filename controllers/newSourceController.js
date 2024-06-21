@@ -29,8 +29,9 @@ const source_type_list = {
   'drug_monographs': drug_monographs_master,
 };
 
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000';
+const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
 
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
