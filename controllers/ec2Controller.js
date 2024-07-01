@@ -62,124 +62,168 @@ const checkDockerContainerStatus = (publicDns) => {
   });
 };
 
-exports.start = async (req, res) => {
-    const instanceId = process.env.EC2_INSTANCE_ID; // Store your EC2 instance ID securely
-
-    try {
-      // Get the current instance state
-      const describeParams = { InstanceIds: [instanceId] };
-      const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
-      const instanceState = instanceData.Reservations[0].Instances[0].State.Name;
-      const publicDns = instanceData.Reservations[0].Instances[0].PublicDnsName;
-
-      if (instanceState === 'running') {
-        console.log('Instance is running');
-        const isDockerRunning = await checkDockerContainerStatus(publicDns);
-        if (isDockerRunning) {
-          return res.status(200).json({ message: 'EC2 instance and Docker container are already running' });
-        } else {
-            console.log('Docker container is not running');
-          // SSH into the instance and run Docker container
-          const conn = new Client();
-          conn.on('ready', () => {
-            console.log('SSH connection established');
-            conn.exec('sudo docker start ingestion-pipeline', (err, stream) => {
-              if (err) throw err;
-              stream.on('close', (code, signal) => {
-                console.log('Stream closed with code:', code, 'and signal:', signal);
-                conn.end();
-                res.status(200).json({ message: 'EC2 instance was already running, Docker container started successfully' });
-              }).on('data', (data) => {
-                console.log('STDOUT:', data.toString());
-              }).stderr.on('data', (data) => {
-                console.log('STDERR:', data.toString());
-              });
-            });
-          }).connect({
-            host: publicDns,
-            username: process.env.EC2_USERNAME,
-            privateKey: process.env.EC2_PRIVATE_KEY
-          });
+const startDockerContainer = (publicDns) => {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn.on('ready', () => {
+      console.log('SSH connection established');
+      conn.exec('sudo docker start ingestion-pipeline', (err, stream) => {
+        if (err) {
+          conn.end();
+          return reject(err);
         }
-      } else {
-        console.log('Instance is not running');
-        // Start EC2 instance
-        const startParams = { InstanceIds: [instanceId] };
-        await ec2.send(new StartInstancesCommand(startParams));
-
-        // Wait for the instance to be in running state and status checks to complete
-        await waitForRunningState(instanceId);
-        console.log('Instance is running');
-        await waitForInstanceStatusChecks(instanceId);
-        console.log('Instance status checks complete');
-
-        // SSH into the instance and run Docker container
-        const conn = new Client();
-        conn.on('ready', () => {
-          console.log('SSH connection established');
-          conn.exec('sudo docker start ingestion-pipeline', (err, stream) => {
-            if (err) throw err;
-            stream.on('close', (code, signal) => {
-              console.log('Stream closed with code:', code, 'and signal:', signal);
-              conn.end();
-              res.status(200).json({ message: 'EC2 instance started and Docker container launched successfully' });
-            }).on('data', (data) => {
-              console.log('STDOUT:', data.toString());
-            }).stderr.on('data', (data) => {
-              console.log('STDERR:', data.toString());
-            });
-          });
-        }).connect({
-          host: publicDns,
-          username: process.env.EC2_USERNAME,
-          privateKey: process.env.EC2_PRIVATE_KEY
+        stream.on('close', (code, signal) => {
+          console.log('Stream closed with code:', code, 'and signal:', signal);
+          conn.end();
+          resolve();
+        }).on('data', (data) => {
+          console.log('STDOUT:', data.toString());
+        }).stderr.on('data', (data) => {
+          console.log('STDERR:', data.toString());
         });
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      res.status(500).json({ message: 'Failed to start EC2 instance and launch Docker container', error });
-    }
+      });
+    }).connect({
+      host: publicDns,
+      username: process.env.EC2_USERNAME,
+      privateKey: process.env.EC2_PRIVATE_KEY
+    });
+  });
 };
 
-exports.stop = async (req, res) => {
-    const instanceId = process.env.EC2_INSTANCE_ID; // Store your EC2 instance ID securely
-
-    try {
-      // Get the current instance state
-      const describeParams = { InstanceIds: [instanceId] };
-      const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
-      const instanceState = instanceData.Reservations[0].Instances[0].State.Name;
-
-      if (instanceState === 'stopped') {
-        console.log('Instance is already stopped');
-        return res.status(200).json({ message: 'EC2 instance is already stopped' });
-      } else {
-        console.log('Instance is not stopped');
-        // Stop EC2 instance
-        const stopParams = { InstanceIds: [instanceId] };
-        await ec2.send(new StopInstancesCommand(stopParams));
+const stopDockerContainer = (publicDns) => {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    conn.on('ready', () => {
+      conn.exec('sudo docker stop ingestion-pipeline', (err, stream) => {
+        if (err) {
+          conn.end();
+          return reject(err);
+        }
+        stream.on('close', (code, signal) => {
+          console.log('Stream closed with code:', code, 'and signal:', signal);
+          conn.end();
+          resolve();
+        }).on('data', (data) => {
+          console.log('STDOUT:', data.toString());
+        }).stderr.on('data', (data) => {
+          console.log('STDERR:', data.toString());
+        });
+      });
+    }).connect({
+      host: publicDns,
+      username: process.env.EC2_USERNAME,
+      privateKey: process.env.EC2_PRIVATE_KEY
+    });
+  });
+};
+      
   
-        // Wait for the instance to be in stopped state
-        await waitForStoppedState(instanceId);
-        console.log('Instance is stopped');
-        res.status(200).json({ message: 'EC2 instance stopped successfully' });
-      }
-    } catch (error) {
-      console.error('Error stopping EC2 instance:', error);
-      res.status(500).json({ message: 'Failed to stop EC2 instance', error });
+
+exports.startInstance = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+
+  try {
+    const describeParams = { InstanceIds: [instanceId] };
+    const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
+    const instanceState = instanceData.Reservations[0].Instances[0].State.Name;
+
+    if (instanceState === 'running') {
+      return res.status(200).json({ message: 'EC2 instance is already running' });
     }
+
+    await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
+    await waitForRunningState(instanceId);
+    await waitForInstanceStatusChecks(instanceId);
+
+    res.status(200).json({ message: 'EC2 instance started successfully' });
+  } catch (error) {
+    console.error('Error starting EC2 instance:', error);
+    res.status(500).json({ message: 'Failed to start EC2 instance', error });
+  }
 };
 
-exports.check_instance_state = async (req, res) => {
-  const instanceId = process.env.EC2_INSTANCE_ID; // Store your EC2 instance ID securely
+exports.stopInstance = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+
+  try {
+    const describeParams = { InstanceIds: [instanceId] };
+    const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
+    const instanceState = instanceData.Reservations[0].Instances[0].State.Name;
+
+    if (instanceState === 'stopped') {
+      return res.status(200).json({ message: 'EC2 instance is already stopped' });
+    }
+
+    await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
+    await waitForStoppedState(instanceId);
+
+    res.status(200).json({ message: 'EC2 instance stopped successfully' });
+  } catch (error) {
+    console.error('Error stopping EC2 instance:', error);
+    res.status(500).json({ message: 'Failed to stop EC2 instance', error });
+  }
+};
+
+exports.checkInstanceState = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
   const params = { InstanceIds: [instanceId], IncludeAllInstances: true };
+
   try {
     const data = await ec2.send(new DescribeInstanceStatusCommand(params));
     const state = data.InstanceStatuses[0]?.InstanceState?.Name || 'unknown';
-    console.log(state);
     res.status(200).json({ state });
   } catch (error) {
     console.error('Error checking instance state:', error);
     res.status(500).json({ message: 'Failed to check EC2 instance state', error });
   }
 };
+
+exports.checkDockerStatus = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+
+  try {
+    const describeParams = { InstanceIds: [instanceId] };
+    const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
+    const publicDns = instanceData.Reservations[0].Instances[0].PublicDnsName;
+
+    const isDockerRunning = await checkDockerContainerStatus(publicDns);
+    res.status(200).json({ isDockerRunning });
+  } catch (error) {
+    console.error('Error checking Docker container status:', error);
+    res.status(500).json({ message: 'Failed to check Docker container status', error });
+  }
+};
+
+exports.startDockerContainer = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+
+  try {
+    const describeParams = { InstanceIds: [instanceId] };
+    const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
+    const publicDns = instanceData.Reservations[0].Instances[0].PublicDnsName;
+
+    await startDockerContainer(publicDns);
+    res.status(200).json({ message: 'Docker container started successfully' });
+  } catch (error) {
+    console.error('Error starting Docker container:', error);
+    res.status(500).json({ message: 'Failed to start Docker container', error });
+  }
+};
+
+exports.stopDockerContainer = async (req, res) => {
+  const instanceId = process.env.EC2_INSTANCE_ID;
+
+  try {
+    const describeParams = { InstanceIds: [instanceId] };
+    const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
+    const publicDns = instanceData.Reservations[0].Instances[0].PublicDnsName;
+
+    await stopDockerContainer(publicDns);
+    res.status(200).json({ message: 'Docker container stopped successfully' });
+  } catch (error) {
+    console.error('Error stopping Docker container:', error);
+    res.status(500).json({ message: 'Failed to stop Docker container', error });
+  }
+}
+
+
