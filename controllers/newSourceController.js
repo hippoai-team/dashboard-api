@@ -70,12 +70,12 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   let query = {};
   let defaultCondition = [];
 
-  if (tab === 0) {
+  if (tab === 0 || tab === 2) { 
     query.source_type = sourceType || Object.keys(source_type_list)[0];
     defaultCondition.push({ $or: [{ status: { $exists: false } }, { status: 'pending' }] });
   }
 
-  if (sourceType) {
+  if (sourceType && tab === 1) {
     defaultCondition.push({ 'metadata.source_type': sourceType });
   }
 
@@ -88,7 +88,9 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   }
   console.log(statusCondition)
 
-  query.$and = [...orConditions, ...andConditions, ...defaultCondition];
+  if (orConditions.length > 0 || andConditions.length > 0 || defaultCondition.length > 0) {
+    query.$and = [...orConditions, ...andConditions, ...defaultCondition];
+  }
   if (statusCondition.length !== 0) {
     query.$and.push(statusCondition);
   }
