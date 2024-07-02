@@ -121,11 +121,12 @@ const stopDockerContainer = (publicDns) => {
 
 exports.startInstance = async (req, res) => {
   const instanceId = process.env.EC2_INSTANCE_ID;
-
+  console.log('starting instance with id', instanceId)
   try {
     const describeParams = { InstanceIds: [instanceId] };
     const instanceData = await ec2.send(new DescribeInstancesCommand(describeParams));
     const instanceState = instanceData.Reservations[0].Instances[0].State.Name;
+    console.log('instance state', instanceState)
 
     if (instanceState === 'running') {
       return res.status(200).json({ message: 'EC2 instance is already running' });

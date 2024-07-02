@@ -30,8 +30,8 @@ const source_type_list = {
 };
 
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000/pipeline';
-//const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000/pipeline';
+const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
 
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
@@ -70,9 +70,11 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   let query = {};
   let defaultCondition = [];
 
-  if (tab === 0 || tab === 2) { 
-    query.source_type = sourceType || Object.keys(source_type_list)[0];
+  if (tab === 0 || tab == 2 && !status) { 
     defaultCondition.push({ $or: [{ status: { $exists: false } }, { status: 'pending' }] });
+  } 
+  if (tab === 0 || tab === 2) {
+    query.source_type = sourceType || Object.keys(source_type_list)[0];
   }
 
   if (sourceType && tab === 1) {
@@ -81,20 +83,20 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
 
   let statusCondition = [];
   if (status) {
-    console.log(status)
+    console.log('status', status)
     statusCondition = status === 'active' || status === 'processed' ? 
       { processed: status === 'processed', status: 'active' } :
       { status: status };
   }
-  console.log(statusCondition)
 
-  if (orConditions.length > 0 || andConditions.length > 0 || defaultCondition.length > 0) {
-    query.$and = [...orConditions, ...andConditions, ...defaultCondition];
-  }
+  query.$and = [...orConditions, ...andConditions, ...defaultCondition];
   if (statusCondition.length !== 0) {
     query.$and.push(statusCondition);
   }
-
+  console.log('query', query)
+  console.log('query.$and', query.$and)
+  console.log('query.$or', query.$or)
+  console.log('query.status', query.status)
   return query;
 }
 
@@ -257,7 +259,6 @@ exports.index = async (req, res) => {
     const andConditions = search ? [searchQueries] : [];
     const orConditions = [];
     const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions);
-    console.log(query);
     let responseData;
     switch (tab) {
       case 0:
