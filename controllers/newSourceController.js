@@ -66,43 +66,31 @@ async function uploadImageToS3(imageBuffer, bucketName, key, contentType) {
   }
 }
 
-function buildQuery(tab, search, sourceType, status, orConditions) {
+function buildQuery(tab, search, sourceType, status, andConditions, orConditions) {
   let query = {};
+  let defaultCondition = [];
+
   if (tab === 0) {
     query.source_type = sourceType || Object.keys(source_type_list)[0];
-    if (status) {
-      if (status === 'pending') {
-        query.$and = [
-          ...orConditions,
-          { $or: [{ status: { $exists: false } }, { status: 'pending' }] }
-        ];
-      } else {
-        query.$and = [
-          ...orConditions,
-          { status: status }
-        ];
-      }
-    } else {
-      query.$and = [
-        ...orConditions,
-        { $or: [{ status: { $exists: false } }, { status: 'pending' }] }
-      ];
-    }
-  } else {
-    if (sourceType) {
-      query['metadata.source_type'] = sourceType;
-    }
-    if (status) {
-      if (status === 'processed') {
-        query.processed = true;
-      } else {
-        query.status = status;
-        query.processed = false;
-      }
-    }
-    else {
-      query.processed = false;
-    }
+    defaultCondition.push({ $or: [{ status: { $exists: false } }, { status: 'pending' }] });
+  }
+
+  if (sourceType) {
+    defaultCondition.push({ 'metadata.source_type': sourceType });
+  }
+
+  let statusCondition = [];
+  if (status) {
+    console.log(status)
+    statusCondition = status === 'active' || status === 'processed' ? 
+      { processed: status === 'processed', status: 'active' } :
+      { status: status };
+  }
+  console.log(statusCondition)
+
+  query.$and = [...orConditions, ...andConditions, ...defaultCondition];
+  if (statusCondition.length !== 0) {
+    query.$and.push(statusCondition);
   }
 
   return query;
@@ -252,18 +240,22 @@ exports.index = async (req, res) => {
     const sourceType = req.query.source_type || "";
     const status = req.query.status || "";
     const baseSearch = { $regex: search, $options: "i" };
-    const searchQueries = tab === 1 ? [
-      { 'metadata.title': baseSearch },
-      { 'metadata.publisher': baseSearch },
-      { 'metadata.subspecialty': baseSearch }
-    ] : [
-      { title: baseSearch },
-      { publisher: baseSearch },
-      { subspecialty: baseSearch }
-    ];
+    const searchQueries = {
+      $or: tab === 1 ? [
+        { 'metadata.title': baseSearch },
+        { 'metadata.publisher': baseSearch },
+        { 'metadata.subspecialty': baseSearch }
+      ] : [
+        { title: baseSearch },
+        { publisher: baseSearch },
+        { subspecialty: baseSearch }
+      ]
+    };
 
-    const orConditions = search ? [{ $or: searchQueries }] : [];
-    const query = buildQuery(tab, search, sourceType, status, orConditions);
+    const andConditions = search ? [searchQueries] : [];
+    const orConditions = [];
+    const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions);
+    console.log(query);
     let responseData;
     switch (tab) {
       case 0:
