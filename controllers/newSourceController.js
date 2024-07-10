@@ -67,48 +67,58 @@ async function uploadImageToS3(imageBuffer, bucketName, key, contentType) {
 }
 
 function buildQuery(tab, search, sourceType, status, andConditions, orConditions, loadType) {
-  let query = {};
-  let defaultCondition = [];
+  const conditions = [
+    ...orConditions,
+    ...andConditions,
+    ...getTabConditions(tab, sourceType, status, loadType),
+    ...getStatusConditions(status),
+  ].filter(Boolean);
 
-  if ((tab === 0 || tab === 2) && !status) { 
-    defaultCondition.push({ $or: [{ status: { $exists: false } }, { status: 'pending' }] });
-  } 
-  if (tab === 0 || tab === 2) {
-    query.source_type = sourceType || Object.keys(source_type_list)[0];
-  }
+  return conditions.length ? { $and: conditions } : {};
+}
 
-  if (tab === 1) {
-    defaultCondition.push({ 'metadata.source_type': sourceType });
-  }
-  if (loadType) {
-    if (tab === 0) {
-      defaultCondition.push({ load_type: loadType });
-    } else if (tab === 1) {
-      defaultCondition.push({ 'metadata.load_type': loadType });
+function getTabConditions(tab, sourceType, status, loadType) {
+  const isTab0or2 = tab === 0 || tab === 2;
+  return [
+    isTab0or2 && { source_type: sourceType || Object.keys(source_type_list)[0] },
+    isTab0or2 && !status && { $or: [{ status: { $exists: false } }, { status: 'pending' }] },
+    tab === 1 && sourceType && { 'metadata.source_type': sourceType },
+    loadType && { [`${tab === 1 ? 'metadata.' : ''}load_type`]: loadType },
+  ].filter(Boolean);
+}
+
+function getStatusConditions(status) {
+  if (!status) return [];
+  return status === 'active' || status === 'processed'
+    ? [{ processed: status === 'processed', status: 'active' }]
+    : [{ status }];
+}
+
+async function handleSourcesTab(query, skip, limit, sortOrder) {
+  let effectiveSourceType;
+
+  // Check if source_type is in the $and array
+  if (query.$and) {
+    const sourceTypeCondition = query.$and.find(condition => condition.source_type);
+    if (sourceTypeCondition) {
+      effectiveSourceType = sourceTypeCondition.source_type;
     }
   }
 
-  let statusCondition = {};
-  if (status) {
-    statusCondition = status === 'active' || status === 'processed' ? 
-      { processed: status === 'processed', status: 'active' } :
-      { status: status };
+  // If not found in $and, check if it's directly in the query
+  if (!effectiveSourceType && query.source_type) {
+    effectiveSourceType = query.source_type;
   }
 
-  if (orConditions.length > 0 || andConditions.length > 0 || defaultCondition.length > 0) {
-    query.$and = [...orConditions, ...andConditions, ...defaultCondition];
+  // If still not found, use the default
+  if (!effectiveSourceType) {
+    effectiveSourceType = Object.keys(source_type_list)[0];
   }
-  if (Object.keys(statusCondition).length > 0) {
-    console.log('statusCondition', statusCondition)
-    query.$and.push(statusCondition);
+
+  if (!source_type_list[effectiveSourceType]) {
+    throw new Error(`Invalid source type: ${effectiveSourceType}`);
   }
-  console.log('query', query)
-  return query;
-}
 
-
-async function handleSourcesTab(query, skip, limit, sortOrder) {
-  const effectiveSourceType = query.source_type;
   const sources = await source_type_list[effectiveSourceType].find(query, null, { skip, limit })
     .sort({ timestamp: sortOrder }).lean();
   const total_source_counts = await source_type_list[effectiveSourceType].countDocuments(query) 
@@ -170,6 +180,7 @@ exports.index = async (req, res) => {
     const andConditions = search ? [searchQueries] : [];
     const orConditions = [];
     const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions, loadType);
+    console.log('query', query)
     let responseData;
     switch (tab) {
       case 0:
