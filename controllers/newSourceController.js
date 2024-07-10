@@ -66,7 +66,7 @@ async function uploadImageToS3(imageBuffer, bucketName, key, contentType) {
   }
 }
 
-function buildQuery(tab, search, sourceType, status, andConditions, orConditions) {
+function buildQuery(tab, search, sourceType, status, andConditions, orConditions, loadType) {
   let query = {};
   let defaultCondition = [];
 
@@ -79,6 +79,14 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
 
   if (sourceType && tab === 1) {
     defaultCondition.push({ 'metadata.source_type': sourceType });
+  }
+  if (loadType) {
+    if (tab === 0) {
+      defaultCondition.push({ load_type: loadType });
+    } else if (tab === 1) {
+      defaultCondition.push({ 'metadata.load_type': loadType });
+    }
+    
   }
 
   let statusCondition = [];
@@ -95,10 +103,6 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   if (statusCondition.length > 0) {
     query.$and.push(statusCondition);
   }
-  console.log('query', query)
-  console.log('query.$and', query.$and)
-  console.log('query.$or', query.$or)
-  console.log('query.status', query.status)
   return query;
 }
 
@@ -147,6 +151,7 @@ exports.index = async (req, res) => {
     const skip = (page - 1) * perPage;
     const search = req.query.search || "";
     const sourceType = req.query.source_type || "";
+    const loadType = req.query.load_type || "";
     const status = req.query.status || "";
     const baseSearch = { $regex: search, $options: "i" };
     const searchQueries = {
@@ -163,7 +168,7 @@ exports.index = async (req, res) => {
 
     const andConditions = search ? [searchQueries] : [];
     const orConditions = [];
-    const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions);
+    const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions, loadType);
     let responseData;
     switch (tab) {
       case 0:
