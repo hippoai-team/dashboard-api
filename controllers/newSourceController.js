@@ -70,14 +70,14 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   let query = {};
   let defaultCondition = [];
 
-  if (tab === 0 || tab == 2 && !status) { 
+  if ((tab === 0 || tab === 2) && !status) { 
     defaultCondition.push({ $or: [{ status: { $exists: false } }, { status: 'pending' }] });
   } 
   if (tab === 0 || tab === 2) {
     query.source_type = sourceType || Object.keys(source_type_list)[0];
   }
 
-  if (sourceType && tab === 1) {
+  if (tab === 1) {
     defaultCondition.push({ 'metadata.source_type': sourceType });
   }
   if (loadType) {
@@ -86,12 +86,10 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
     } else if (tab === 1) {
       defaultCondition.push({ 'metadata.load_type': loadType });
     }
-    
   }
 
-  let statusCondition = [];
+  let statusCondition = {};
   if (status) {
-    console.log('status', status)
     statusCondition = status === 'active' || status === 'processed' ? 
       { processed: status === 'processed', status: 'active' } :
       { status: status };
@@ -100,11 +98,14 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
   if (orConditions.length > 0 || andConditions.length > 0 || defaultCondition.length > 0) {
     query.$and = [...orConditions, ...andConditions, ...defaultCondition];
   }
-  if (statusCondition.length > 0) {
+  if (Object.keys(statusCondition).length > 0) {
+    console.log('statusCondition', statusCondition)
     query.$and.push(statusCondition);
   }
+  console.log('query', query)
   return query;
 }
+
 
 async function handleSourcesTab(query, skip, limit, sortOrder) {
   const effectiveSourceType = query.source_type;
