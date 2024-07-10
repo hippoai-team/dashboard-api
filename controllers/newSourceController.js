@@ -30,8 +30,8 @@ const source_type_list = {
 };
 
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
-//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000/pipeline';
-const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000/pipeline';
+//const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
 
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
@@ -89,8 +89,10 @@ function buildQuery(tab, search, sourceType, status, andConditions, orConditions
       { status: status };
   }
 
-  query.$and = [...orConditions, ...andConditions, ...defaultCondition];
-  if (statusCondition.length !== 0) {
+  if (orConditions.length > 0 || andConditions.length > 0 || defaultCondition.length > 0) {
+    query.$and = [...orConditions, ...andConditions, ...defaultCondition];
+  }
+  if (statusCondition.length > 0) {
     query.$and.push(statusCondition);
   }
   console.log('query', query)
@@ -136,7 +138,55 @@ async function handleImageSourcesTab(query, skip, limit, sortOrder) {
   const total_source_counts = await imageSource.countDocuments(query) 
   return { sources, total_source_counts };
 }
+exports.index = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 10;
+    const tab = parseInt(req.query.active_tab);
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+    const skip = (page - 1) * perPage;
+    const search = req.query.search || "";
+    const sourceType = req.query.source_type || "";
+    const status = req.query.status || "";
+    const baseSearch = { $regex: search, $options: "i" };
+    const searchQueries = {
+      $or: tab === 1 ? [
+        { 'metadata.title': baseSearch },
+        { 'metadata.publisher': baseSearch },
+        { 'metadata.subspecialty': baseSearch }
+      ] : [
+        { title: baseSearch },
+        { publisher: baseSearch },
+        { subspecialty: baseSearch }
+      ]
+    };
 
+    const andConditions = search ? [searchQueries] : [];
+    const orConditions = [];
+    const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions);
+    let responseData;
+    switch (tab) {
+      case 0:
+        responseData = await handleSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      case 1:
+        responseData = await handleMasterSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      case 2:
+        responseData = await handleImageSourcesTab(query, skip, perPage, sortOrder);
+        break;
+      default:
+        throw new Error("Invalid tab selection");
+    }
+    res.json({
+      ...responseData,
+      source_types: Object.keys(source_type_list),
+    });
+  } catch (error) {
+    console.error("Error in index function:", error);
+    res.status(500).json({ error: "Failed to fetch sources due to server error" });
+  }
+};
 
 exports.store = async (req, res) => {
   try {
@@ -233,55 +283,7 @@ exports.store = async (req, res) => {
   }
 };
 
-exports.index = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const perPage = parseInt(req.query.perPage) || 10;
-    const tab = parseInt(req.query.active_tab);
-    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
-    const skip = (page - 1) * perPage;
-    const search = req.query.search || "";
-    const sourceType = req.query.source_type || "";
-    const status = req.query.status || "";
-    const baseSearch = { $regex: search, $options: "i" };
-    const searchQueries = {
-      $or: tab === 1 ? [
-        { 'metadata.title': baseSearch },
-        { 'metadata.publisher': baseSearch },
-        { 'metadata.subspecialty': baseSearch }
-      ] : [
-        { title: baseSearch },
-        { publisher: baseSearch },
-        { subspecialty: baseSearch }
-      ]
-    };
 
-    const andConditions = search ? [searchQueries] : [];
-    const orConditions = [];
-    const query = buildQuery(tab, search, sourceType, status, andConditions, orConditions);
-    let responseData;
-    switch (tab) {
-      case 0:
-        responseData = await handleSourcesTab(query, skip, perPage, sortOrder);
-        break;
-      case 1:
-        responseData = await handleMasterSourcesTab(query, skip, perPage, sortOrder);
-        break;
-      case 2:
-        responseData = await handleImageSourcesTab(query, skip, perPage, sortOrder);
-        break;
-      default:
-        throw new Error("Invalid tab selection");
-    }
-    res.json({
-      ...responseData,
-      source_types: Object.keys(source_type_list),
-    });
-  } catch (error) {
-    console.error("Error in index function:", error);
-    res.status(500).json({ error: "Failed to fetch sources due to server error" });
-  }
-};
 
 exports.show = async (req, res) => {
   try {
