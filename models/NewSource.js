@@ -113,6 +113,11 @@ const imageSourceSchema = {
       type: String,
       required: true
     },
+    image_url:{
+      type:String,
+      required:true
+
+    },
     source_url: {
       type: String,
       required: true
