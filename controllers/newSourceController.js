@@ -29,10 +29,7 @@ const source_type_list = {
   'drug_monographs': drug_monographs_master,
 };
 
-//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://34.231.170.38:8000';
-//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'http://localhost:8000/pipeline';
-const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline'
-
+const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'https://pendiumdev.com/pipeline';
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
     Bucket: bucketName,
@@ -377,6 +374,14 @@ exports.update = async (req, res) => {
         const fileKey = `all-pdfs/${id}.pdf`;
         fileLocation = await uploadFileToS3(req.file.buffer, 'hippo-sources', fileKey);
         master_source_document.metadata.fileLocation = fileLocation;
+        const mappingDoc = new S3Mapping({
+          _id: new mongoose.Types.ObjectId(id),
+          mongodb_id: id,
+          s3_key: fileKey
+        });
+        await mappingDoc.save();
+       
+      
       }
 
       master_source_document.markModified('metadata');
