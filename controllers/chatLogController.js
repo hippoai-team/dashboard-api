@@ -119,7 +119,7 @@ exports.index = async (req, res) => {
 
     //get active beta users from BetaUser model and add to query
 
-
+console.log('query', query)
 
   const result = await ChatLog.aggregate([
     { $match: query },

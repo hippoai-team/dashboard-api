@@ -1,6 +1,9 @@
 // models/Source.js
 const mongoose = require('mongoose');
-
+pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+});
 const betaUserSchema = new mongoose.Schema({
     name: String,
     invite_sent: Boolean,
@@ -26,6 +29,6 @@ const betaUserSchema = new mongoose.Schema({
 
 });
 
-const BetaUser = mongoose.model('betauser', betaUserSchema);
+const BetaUser = pendium_db.model('betauser', betaUserSchema, 'betausers');
 
 module.exports = BetaUser;
