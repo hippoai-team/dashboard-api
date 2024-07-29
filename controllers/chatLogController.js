@@ -117,10 +117,6 @@ exports.index = async (req, res) => {
             query.user_rating = userRatingFilter;
         }
 
-    //get active beta users from BetaUser model and add to query
-
-console.log('query', query)
-
   const result = await ChatLog.aggregate([
     { $match: query },
     { $sort: { datetime: 1 } },
