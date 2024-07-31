@@ -1,9 +1,12 @@
 // models/Source.js
 const mongoose = require('mongoose');
-pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
+MONGO_URL_2='mongodb+srv://omrinach:Omri4438@summari.ugwoxib.mongodb.net/pendium_db'
+
+pendium_db = mongoose.createConnection(MONGO_URL_2, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });
+
 const betaUserSchema = new mongoose.Schema({
     name: String,
     invite_sent: Boolean,

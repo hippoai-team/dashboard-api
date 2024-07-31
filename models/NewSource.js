@@ -133,7 +133,8 @@ const imageSourceSchema = {
     date_added: {
       type: Date,
       default: () => new Date()
-    }
+    },
+    
   };
 
 

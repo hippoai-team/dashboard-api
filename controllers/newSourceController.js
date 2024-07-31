@@ -146,7 +146,7 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
 
 async function handleImageSourcesTab(query, skip, limit, sortOrder) {
   const sources = await imageSource.find(query, null, { skip, limit })
-    .sort({ timestamp: sortOrder }).lean();
+    .sort({ date_added: sortOrder }).lean();
   const total_source_counts = await imageSource.countDocuments(query) 
   return { sources, total_source_counts };
 }
