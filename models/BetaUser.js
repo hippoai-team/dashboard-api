@@ -1,7 +1,6 @@
 // models/Source.js
 const mongoose = require('mongoose');
-MONGO_URL_2='mongodb+srv://omrinach:Omri4438@summari.ugwoxib.mongodb.net/pendium_db'
-
+const MONGO_URL_2 = process.env.MONGO_URL_2;
 pendium_db = mongoose.createConnection(MONGO_URL_2, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
