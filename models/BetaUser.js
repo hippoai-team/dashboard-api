@@ -1,7 +1,9 @@
 // models/Source.js
 const mongoose = require('mongoose');
-const MONGO_URL_2 = process.env.MONGO_URL_2;
-pendium_db = mongoose.createConnection(MONGO_URL_2, {
+//show all process env
+const dotenv = require('dotenv');
+dotenv.config();
+pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });

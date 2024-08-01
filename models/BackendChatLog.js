@@ -7,6 +7,7 @@ pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
     useUnifiedTopology: true,
 });
 
+
 const BackendChatLogSchema = new mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
     datetime: Date,
