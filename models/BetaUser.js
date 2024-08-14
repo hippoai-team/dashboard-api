@@ -33,6 +33,6 @@ const betaUserSchema = new mongoose.Schema({
 
 });
 
-const BetaUser = pendium_db.model('betauser', betaUserSchema, 'betausers');
+const BetaUser = pendium_db.model('betauser', betaUserSchema, 'beta_emails');
 
 module.exports = BetaUser;
