@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: null
   },
+  threads: {
+    type: Array,
+    default: []
+  },
   sources: {
     type: Array,
     default: []
