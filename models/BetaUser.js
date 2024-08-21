@@ -1,12 +1,6 @@
 // models/Source.js
 const mongoose = require('mongoose');
 //show all process env
-const dotenv = require('dotenv');
-dotenv.config();
-pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
 
 const betaUserSchema = new mongoose.Schema({
     name: String,
@@ -33,6 +27,6 @@ const betaUserSchema = new mongoose.Schema({
 
 });
 
-const BetaUser = pendium_db.model('betauser', betaUserSchema, 'beta_emails');
+const BetaUser = mongoose.model('betauser', betaUserSchema, 'beta_emails');
 
 module.exports = BetaUser;

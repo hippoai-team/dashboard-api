@@ -1,11 +1,6 @@
 const mongoose = require('mongoose');
 //config dotenv
-const dotenv = require('dotenv');
-dotenv.config();
-pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
+
 
 const UsageEntrySchema = new mongoose.Schema({
     timestamp: {
@@ -18,6 +13,6 @@ const UsageEntrySchema = new mongoose.Schema({
     model: String,
 });
 
-const UsageEntry = pendium_db.model('usage_entry', UsageEntrySchema, 'usage');
+const UsageEntry = mongoose.model('usage_entry', UsageEntrySchema, 'usage');
 
 module.exports = UsageEntry;

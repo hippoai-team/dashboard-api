@@ -1,8 +1,4 @@
 const mongoose = require('mongoose');
-pendium_db = mongoose.createConnection(process.env.MONGO_URL_2, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
 
 const newSourceSchema = new mongoose.Schema({
   _id: mongoose.Schema.Types.ObjectId,
@@ -140,15 +136,15 @@ const imageSourceSchema = {
 
 
 function createNewSourceModel(collectionName) {
-    return pendium_db.model('NewSource', newSourceSchema, collectionName);
+    return mongoose.model('NewSource', newSourceSchema, collectionName);
   }
 
   function createNewMasterSourceModel(collectionName) {
-    return pendium_db.model('NewMasterSource', newMasterSourceSchema, collectionName);
+    return mongoose.model('NewMasterSource', newMasterSourceSchema, collectionName);
   }
 
   function createImageSourceModel(collectionName) {
-    return pendium_db.model('ImageSource', imageSourceSchema, collectionName);
+    return mongoose.model('ImageSource', imageSourceSchema, collectionName);
   }
   
 module.exports = {
