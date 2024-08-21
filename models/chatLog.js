@@ -22,6 +22,6 @@ const chatLogSchema = new mongoose.Schema({
     updated_at: Date
 });
 
-const ChatLog = mongoose.model('chat_log', chatLogSchema);
+const ChatLog = mongoose.model('chat_log', chatLogSchema, 'chat_logs_hippo');
 
 module.exports = ChatLog;
