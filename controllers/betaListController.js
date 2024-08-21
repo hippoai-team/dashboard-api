@@ -224,7 +224,7 @@ exports.emailInviteToUser = async (req, res) => {
         to: email,
         subject: `You're invited to sign up for HippoAI`,
         text: `
-        Hi ${user.name},
+        Hi ${user.name ? user.name : 'there'},
         Thank you for your interest in HippoAI!
 
         You've been invited to sign up for HippoAI by Pendium Health. 
