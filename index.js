@@ -5,7 +5,6 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const sourceRoutes = require("./api/sourceRoutes");
 const authRoutes = require("./api/authRoutes");
 const betaListRoutes = require("./api/betaListRoute");
 const chatLogRoutes = require("./api/chatLogRoutes");
@@ -22,7 +21,6 @@ app.use(bodyParser.json());
 // config
 dotenv.config();
 const MONGO_URL = process.env.MONGO_URL;
-const MONGO_URL_2 = process.env.MONGO_URL_2;
 // Connect to MongoDB
 mongoose.connect(MONGO_URL, {
   useNewUrlParser: true,
@@ -36,7 +34,6 @@ app.get('/', (req, res) => {
 });
 
 // routes
-app.use('/api/sources', sourceRoutes);
 app.use('/api/betalist', betaListRoutes)
 app.use('/api/chatlogs', chatLogRoutes)
 app.use('/api/users', userRoutes)

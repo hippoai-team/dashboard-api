@@ -25,7 +25,7 @@ exports.index = async (req, res) => {
         let startDate = new Date(dateRangeStart);
         let endDate = new Date(dateRangeEnd);
         endDate.setDate(endDate.getDate() + 1); // Add one day to the end date
-        query.datetime = { $gte: startDate, $lte: endDate };
+        query.created_at = { $gte: startDate, $lte: endDate };
       } else if (dateRange && dateRangeValues.includes(dateRange)) {
         let dateLimit;
         switch (dateRange) {
@@ -42,7 +42,7 @@ exports.index = async (req, res) => {
             dateLimit = null;
         }
         if (dateLimit) {
-          query.datetime = { $gte: dateLimit };
+          query.created_at = { $gte: dateLimit };
         }
       }
     
@@ -72,7 +72,7 @@ exports.index = async (req, res) => {
         startOfDay.setHours(0,0,0,0);
         let endOfDay = new Date(dateFilter);
         endOfDay.setHours(23,59,59,999);
-        query.datetime = { $gte: startOfDay, $lte: endOfDay };
+        query.created_at = { $gte: startOfDay, $lte: endOfDay };
     }
     
     const userFilter = req.query.user || "";
@@ -119,7 +119,7 @@ exports.index = async (req, res) => {
 
   const result = await ChatLog.aggregate([
     { $match: query },
-    { $sort: { datetime: 1 } },
+    { $sort: { created_at: 1 } },
     {
       $group: {
         //_id: { $dateToString: { format: "%m/%d/%Y", date: "$datetime" } },
@@ -145,12 +145,13 @@ exports.index = async (req, res) => {
   }
 
   const totalCount = await ChatLog.countDocuments(query);
-
+  console.log('query', query)
   //Query for chat logs with pagination and sorting
     const chatLogs = await ChatLog.find(query)
         .skip(skip)
         .limit(perPage)
-        .sort({ datetime: -1 });
+        .sort({ created_at: -1 });
+      
     
     const users = await ChatLog.distinct("email", query);
 
@@ -168,7 +169,12 @@ exports.index = async (req, res) => {
         chat.totalChatsPercentage = (chat.count / totalChats) * 100;
     });
 
-
+    console.log('chatLogs', chatLogs)
+    for (const chat of chatLogs) {
+      for (const history of chat.chat_history) {
+        console.log('history', history)
+      }
+    }
     const data = {
         chatLogs,
         totalCount,

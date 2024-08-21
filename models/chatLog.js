@@ -6,13 +6,20 @@ const chatLogSchema = new mongoose.Schema({
     time: String,
     datetime: Date,
     thread_uuid: String,
-    thread_status: Boolean,
-    email: String,
-    uuid: String,
-    query: String,
-    response: String,
-    chat_history: Array,
-    sources: Array,
+    chat_history: [
+        {
+            uuid: String,
+            query: String,
+            response: String,
+            currentDate: String,
+            currentTime: String,
+            sources: Array,
+            tokenSummary: Object
+        }
+    ],
+    isDeleted: Boolean,
+    created_at: Date,
+    updated_at: Date
 });
 
 const ChatLog = mongoose.model('chat_log', chatLogSchema);
