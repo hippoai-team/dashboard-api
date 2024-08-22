@@ -145,7 +145,6 @@ exports.index = async (req, res) => {
   }
 
   const totalCount = await ChatLog.countDocuments(query);
-  console.log('query', query)
   //Query for chat logs with pagination and sorting
     const chatLogs = await ChatLog.find(query)
         .skip(skip)
@@ -169,7 +168,6 @@ exports.index = async (req, res) => {
         chat.totalChatsPercentage = (chat.count / totalChats) * 100;
     });
 
-    console.log('chatLogs', chatLogs)
     for (const chat of chatLogs) {
       for (const history of chat.chat_history) {
         console.log('history', history)
