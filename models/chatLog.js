@@ -5,6 +5,7 @@ const chatLogSchema = new mongoose.Schema({
     date: String,
     time: String,
     datetime: Date,
+    role: String,
     thread_uuid: String,
     chat_history: [
         {

@@ -7,14 +7,13 @@ exports.index = async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
       const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-      const filterOutAdmin = req.query.filterOutAdmin || true;
+      const filterOutAdmin = req.query.filterOutAdmin || 'false';
       // Calculate the skip value based on the requested page
       const skip = (page - 1) * perPage;
-  
-      // Initializing the search query to status == 'remove' or 'removed'
+      // Initializing the sea rch query to status == 'remove' or 'removed'
       let query = {}
 
-      if (filterOutAdmin ){
+      if (filterOutAdmin=='true'){
         query.role='user'
       }
   
@@ -172,11 +171,6 @@ exports.index = async (req, res) => {
         chat.totalChatsPercentage = (chat.count / totalChats) * 100;
     });
 
-    for (const chat of chatLogs) {
-      for (const history of chat.chat_history) {
-        console.log('history', history)
-      }
-    }
     const data = {
         chatLogs,
         totalCount,
