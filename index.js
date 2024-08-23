@@ -12,6 +12,7 @@ const userRoutes = require("./api/userRoutes");
 const usageRoutes = require("./api/usageRoutes");
 const newSourceRoutes = require("./api/newSourceRoutes");
 const ec2Routes = require("./api/ec2Routes");
+const kpiRoutes = require("./api/kpiRoutes");
 
 // middlewares
 app.use(express.json({ extended: false }));
@@ -41,6 +42,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/usage', usageRoutes)
 app.use('/api/master-sources', newSourceRoutes)
 app.use('/api/pipeline', ec2Routes)
+app.use('/api/kpi', kpiRoutes)
 
 app.use('/admin', authRoutes);
 
