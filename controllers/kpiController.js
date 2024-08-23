@@ -52,7 +52,8 @@ async function calculateAverageDailyQueries(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role: 'user'
             }
         },
         {
@@ -89,7 +90,9 @@ async function calculateDailyActiveUsers(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
+
             }
         },
         {
@@ -125,7 +128,8 @@ async function weeklyUserEngagement(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
@@ -227,7 +231,8 @@ async function calculateTotalQueries(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
@@ -256,7 +261,8 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
@@ -343,7 +349,8 @@ async function calculateChurnRate(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
@@ -448,7 +455,8 @@ async function calculateFeatureUseFrequencyPrimaryLiteratureVsSource(startDate, 
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
@@ -568,7 +576,8 @@ async function calculateUserConversionRate(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+                createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role:'user'
             }
         },
         {
