@@ -6,7 +6,6 @@ const User = require('../models/userModel');
 exports.index = async (req, res) => {
     try {
         const { kpi, startDate, endDate } = req.query;
-        console.log('req query',req.query)
         let result;
 
         switch (kpi) {
@@ -41,7 +40,7 @@ exports.index = async (req, res) => {
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
-        console.log(result)
+
         res.json(result);
     } catch (error) {
         console.error('Error in KPI calculation:', error);
@@ -81,9 +80,7 @@ async function calculateAverageDailyQueries(startDate, endDate) {
             $sort: { date: 1 }
         }
     ];
-    console.log('pipeline',pipeline)
-    const test = await ChatLog.find({}).limit(1)
-    console.log('test',test)
+
     const result = await ChatLog.aggregate(pipeline);
     return { kpi: 'Average Daily Queries Per User', data: result };
 }
@@ -442,8 +439,7 @@ async function calculateFeatureUseFrequencySaveSources(startDate, endDate) {
             $sort: { savedSourcesCount: -1 }
         }
     ];
-    const test = await FeatureInteraction.find({})
-    console.log('test',test)
+ 
     const result = await FeatureInteraction.aggregate(pipeline);
     return { kpi: 'Feature Use Frequency (Save Sources)', data: result };
 }
