@@ -7,12 +7,16 @@ exports.index = async (req, res) => {
     try {
       const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
       const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-    
+      const filterOutAdmin = req.query.filterOutAdmin || true;
       // Calculate the skip value based on the requested page
       const skip = (page - 1) * perPage;
   
       // Initializing the search query to status == 'remove' or 'removed'
       let query = {}
+
+      if (filterOutAdmin ){
+        query.role='user'
+      }
   
       // Handle text search
       const dateRange = req.query.dateRange || "";
