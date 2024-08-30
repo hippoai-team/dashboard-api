@@ -132,7 +132,7 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
     _id: doc._id,
     timestamp: doc.timestamp,
     status: doc.status,
-    nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`), // Extracting text from each node, prepending with source number, and appending to the sources array
+    //nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`), // Extracting text from each node, prepending with source number, and appending to the sources array
     images: doc.images && Array.isArray(doc.images) ? doc.images.filter(img => img.processed).map(img => ({
       title: img.image_title,
       description: img.image_description,
