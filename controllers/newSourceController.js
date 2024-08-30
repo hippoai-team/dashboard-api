@@ -192,6 +192,7 @@ exports.index = async (req, res) => {
       default:
         throw new Error("Invalid tab selection");
     }
+    console.log('response data', responseData)
     res.json({
       ...responseData,
       source_types: Object.keys(source_type_list),
