@@ -126,7 +126,6 @@ async function handleSourcesTab(query, skip, limit, sortOrder) {
 async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
   let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes images', { skip, limit })
     .sort({ timestamp: sortOrder });
-    console.log('length', sources.length)
   sources = sources.map(doc => ({
     ...doc.metadata,
     processed: doc.processed,
@@ -134,14 +133,13 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
     timestamp: doc.timestamp,
     status: doc.status,
     nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`), // Extracting text from each node, prepending with source number, and appending to the sources array
-    images: doc.images.filter(img => img.processed).map(img => ({
+    images: doc.images && Array.isArray(doc.images) ? doc.images.filter(img => img.processed).map(img => ({
       title: img.image_title,
       description: img.image_description,
       sourceUrl: img.source_url
-    })) // Filtering images where processed is true, then creating an object with title, description, and sourceUrl for each image
+    })) : [] // Checking if images exist and is an array before processing
   }));
-  console.log('length after mapping', sources.length)
-  const total_source_counts =  await newMasterSource.countDocuments(query) 
+  const total_source_counts = await newMasterSource.countDocuments(query) 
   
   return { sources, total_source_counts };
 }
