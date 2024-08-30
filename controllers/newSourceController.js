@@ -126,6 +126,7 @@ async function handleSourcesTab(query, skip, limit, sortOrder) {
 async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
   let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes images', { skip, limit })
     .sort({ timestamp: sortOrder });
+    console.log('length', sources.length)
   sources = sources.map(doc => ({
     ...doc.metadata,
     processed: doc.processed,
@@ -139,6 +140,7 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
       sourceUrl: img.source_url
     })) // Filtering images where processed is true, then creating an object with title, description, and sourceUrl for each image
   }));
+  console.log('length after mapping', sources.length)
   const total_source_counts =  await newMasterSource.countDocuments(query) 
   
   return { sources, total_source_counts };
@@ -192,7 +194,6 @@ exports.index = async (req, res) => {
       default:
         throw new Error("Invalid tab selection");
     }
-    console.log('source_types', Object.keys(source_type_list))
     res.json({
       ...responseData,
       source_types: Object.keys(source_type_list),
