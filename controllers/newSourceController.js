@@ -124,7 +124,7 @@ async function handleSourcesTab(query, skip, limit, sortOrder) {
 }
 
 async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
-  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp nodes images', { skip, limit })
+  let sources = await newMasterSource.find(query, 'metadata status processed id_ timestamp', { skip, limit })
     .sort({ timestamp: sortOrder });
   sources = sources.map(doc => ({
     ...doc.metadata,
@@ -132,12 +132,6 @@ async function handleMasterSourcesTab(query, skip, limit, sortOrder) {
     _id: doc._id,
     timestamp: doc.timestamp,
     status: doc.status,
-    //nodes: doc.nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`), // Extracting text from each node, prepending with source number, and appending to the sources array
-    images: doc.images && Array.isArray(doc.images) ? doc.images.filter(img => img.processed).map(img => ({
-      title: img.image_title,
-      description: img.image_description,
-      sourceUrl: img.source_url
-    })) : [] // Checking if images exist and is an array before processing
   }));
   const total_source_counts = await newMasterSource.countDocuments(query) 
   
@@ -150,6 +144,32 @@ async function handleImageSourcesTab(query, skip, limit, sortOrder) {
   const total_source_counts = await imageSource.countDocuments(query) 
   return { sources, total_source_counts };
 }
+
+exports.fetch_nodes = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('id', id)
+    const source = await newMasterSource.find({ source_id: id }, 'nodes images')
+    if (!source) {
+      return res.status(404).json({ message: 'Source not found' });
+    }
+
+    const nodes = source[0].nodes.map(node => `[source number: ${node.metadata.source_number}] ${node.text}`);
+    const images = source[0].images && Array.isArray(source[0].images) 
+      ? source[0].images.filter(img => img.processed).map(img => ({
+          title: img.image_title,
+          description: img.image_description,
+          sourceUrl: img.source_url
+        })) 
+      : [];
+
+    res.json({ nodes, images });
+  } catch (error) {
+    console.error("Error in fetch_nodes function:", error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 exports.index = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -192,7 +212,6 @@ exports.index = async (req, res) => {
       default:
         throw new Error("Invalid tab selection");
     }
-    console.log('response data', responseData)
     res.json({
       ...responseData,
       source_types: Object.keys(source_type_list),

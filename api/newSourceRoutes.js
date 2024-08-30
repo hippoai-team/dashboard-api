@@ -17,4 +17,5 @@ router.post('/reject', newSourceController.reject);
 router.post('/delete', newSourceController.delete);
 router.post('/store', newSourceController.store);
 router.put('/update', upload.single('pdfFile'), newSourceController.update);
+router.get('/nodes/:id', newSourceController.fetch_nodes);
 module.exports = router;
