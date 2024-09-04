@@ -367,7 +367,7 @@ async function calculateFeatureUseFrequencySaveSources(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                "sources.datetime": { $gte: new Date(startDate), $lte: new Date(endDate) }
+                "sources.createdAt": { $gte: new Date(startDate), $lte: new Date(endDate) }
             }
         },
         {
@@ -375,14 +375,14 @@ async function calculateFeatureUseFrequencySaveSources(startDate, endDate) {
         },
         {
             $match: {
-                "sources.datetime": { $gte: new Date(startDate), $lte: new Date(endDate) }
+                "sources.createdAt": { $gte: new Date(startDate), $lte: new Date(endDate) }
             }
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$sources.datetime" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$sources.createdAt" } },
                 totalSourcesSaved: { $sum: 1 },
-                uniqueUsers: { $addToSet: "$_id" }
+                uniqueUsers: { $addToSet: "$email" }
             }
         },
         {
