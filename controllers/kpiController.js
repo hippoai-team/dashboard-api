@@ -40,7 +40,7 @@ exports.index = async (req, res) => {
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
-
+        console.log('result',result)
         res.json(result);
     } catch (error) {
         console.error('Error in KPI calculation:', error);
@@ -129,14 +129,14 @@ async function weeklyUserEngagement(startDate, endDate) {
         {
             $match: {
                 created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
-                role:'user'
+                role: 'user'
             }
         },
         {
             $group: {
                 _id: {
-                    week: { $week: "$datetime" },
-                    year: { $year: "$datetime" }
+                    week: { $week: "$created_at" },
+                    year: { $year: "$created_at" }
                 },
                 totalQueries: { $sum: { $size: "$chat_history" } },
                 uniqueUsers: { $addToSet: "$email" }
@@ -148,83 +148,42 @@ async function weeklyUserEngagement(startDate, endDate) {
                 year: "$_id.year",
                 totalQueries: 1,
                 uniqueUsers: { $size: "$uniqueUsers" },
-                queriesPerUser: { $divide: ["$totalQueries", { $size: "$uniqueUsers" }] }
-            }
-        },
-        {
-            $sort: { "year": 1, "week": 1 }
-        },
-        {
-            $group: {
-                _id: null,
-                weeks: { $push: "$$ROOT" }
-            }
-        },
-        {
-            $project: {
-                weeklyEngagement: {
-                    $map: {
-                        input: { $range: [1, { $size: "$weeks" }] },
-                        as: "index",
-                        in: {
-                            week: { $arrayElemAt: ["$weeks.week", "$$index"] },
-                            year: { $arrayElemAt: ["$weeks.year", "$$index"] },
-                            queriesPerUser: { $arrayElemAt: ["$weeks.queriesPerUser", "$$index"] },
-                            changeInQueriesPerUser: {
-                                $subtract: [
-                                    { $arrayElemAt: ["$weeks.queriesPerUser", "$$index"] },
-                                    { $arrayElemAt: ["$weeks.queriesPerUser", { $subtract: ["$$index", 1] }] }
-                                ]
-                            },
-                            percentageChange: {
-                                $multiply: [
-                                    {
-                                        $divide: [
-                                            {
-                                                $subtract: [
-                                                    { $arrayElemAt: ["$weeks.queriesPerUser", "$$index"] },
-                                                    { $arrayElemAt: ["$weeks.queriesPerUser", { $subtract: ["$$index", 1] }] }
-                                                ]
-                                            },
-                                            { $arrayElemAt: ["$weeks.queriesPerUser", { $subtract: ["$$index", 1] }] }
-                                        ]
-                                    },
-                                    100
-                                ]
-                            }
-                        }
-                    }
+                queriesPerUser: { 
+                    $cond: [
+                        { $eq: [{ $size: "$uniqueUsers" }, 0] },
+                        0,
+                        { $divide: ["$totalQueries", { $size: "$uniqueUsers" }] }
+                    ]
                 }
             }
         },
         {
-            $unwind: "$weeklyEngagement"
-        },
-        {
-            $match: {
-                "weeklyEngagement.week": { $ne: null }
-            }
-        },
-        {
-            $sort: {
-                "weeklyEngagement.year": 1,
-                "weeklyEngagement.week": 1
-            }
-        },
-        {
-            $project: {
-                _id: 0,
-                week: "$weeklyEngagement.week",
-                year: "$weeklyEngagement.year",
-                queriesPerUser: "$weeklyEngagement.queriesPerUser",
-                changeInQueriesPerUser: "$weeklyEngagement.changeInQueriesPerUser",
-                percentageChange: "$weeklyEngagement.percentageChange"
-            }
+            $sort: { "year": 1, "week": 1 }
         }
     ];
 
     const result = await ChatLog.aggregate(pipeline);
-    return { kpi: 'Weekly User Engagement (Change in Queries per User)', data: result };
+
+    // Calculate week-over-week changes
+    const weeklyEngagement = result.map((week, index) => {
+        const prevWeek = index > 0 ? result[index - 1] : null;
+        const changeInQueriesPerUser = prevWeek 
+            ? week.queriesPerUser - prevWeek.queriesPerUser 
+            : 0;
+        const percentageChange = prevWeek && prevWeek.queriesPerUser !== 0
+            ? ((week.queriesPerUser - prevWeek.queriesPerUser) / prevWeek.queriesPerUser) * 100
+            : 0;
+
+        return {
+            week: week.week,
+            year: week.year,
+            queriesPerUser: week.queriesPerUser,
+            changeInQueriesPerUser,
+            percentageChange
+        };
+    });
+
+    return { kpi: 'Weekly User Engagement (Change in Queries per User)', data: weeklyEngagement };
 }
 
 async function calculateTotalQueries(startDate, endDate) {
@@ -262,14 +221,14 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
         {
             $match: {
                 created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
-                role:'user'
+                role: 'user'
             }
         },
         {
             $group: {
                 _id: {
-                    week: { $week: "$datetime" },
-                    year: { $year: "$datetime" }
+                    week: { $week: "$created_at" },
+                    year: { $year: "$created_at" }
                 },
                 activeUsers: { $addToSet: "$email" }
             }
@@ -278,71 +237,47 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
             $sort: { "_id.year": 1, "_id.week": 1 }
         },
         {
-            $group: {
-                _id: null,
-                weeks: {
-                    $push: {
-                        week: "$_id.week",
-                        year: "$_id.year",
-                        activeUsers: { $size: "$activeUsers" }
-                    }
-                }
-            }
-        },
-        {
             $project: {
-                changeInActiveUsers: {
-                    $map: {
-                        input: { $range: [1, { $size: "$weeks" }] },
-                        as: "index",
-                        in: {
-                            week: { $arrayElemAt: ["$weeks.week", "$$index"] },
-                            year: { $arrayElemAt: ["$weeks.year", "$$index"] },
-                            changePercentage: {
-                                $multiply: [
-                                    {
-                                        $divide: [
-                                            { $subtract: [
-                                                { $arrayElemAt: ["$weeks.activeUsers", "$$index"] },
-                                                { $arrayElemAt: ["$weeks.activeUsers", { $subtract: ["$$index", 1] }] }
-                                            ]},
-                                            { $arrayElemAt: ["$weeks.activeUsers", { $subtract: ["$$index", 1] }] }
-                                        ]
-                                    },
-                                    100
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            $unwind: "$changeInActiveUsers"
-        },
-        {
-            $match: {
-                "changeInActiveUsers.week": { $ne: null }
-            }
-        },
-        {
-            $sort: {
-                "changeInActiveUsers.year": 1,
-                "changeInActiveUsers.week": 1
-            }
-        },
-        {
-            $project: {
-                _id: 0,
-                week: "$changeInActiveUsers.week",
-                year: "$changeInActiveUsers.year",
-                changePercentage: "$changeInActiveUsers.changePercentage"
+                week: "$_id.week",
+                year: "$_id.year",
+                activeUsersCount: { $size: "$activeUsers" }
             }
         }
     ];
 
     const result = await ChatLog.aggregate(pipeline);
-    return { kpi: 'Change in Active Users (%)', data: result };
+
+    const weeklyTurnover = result.map((week, index) => {
+        if (index === 0) {
+            return {
+                week: week.week,
+                year: week.year,
+                activeUsers: week.activeUsersCount,
+                newUsers: week.activeUsersCount,
+                churnedUsers: 0,
+                changePercentage: 0,
+                turnoverRate: 0
+            };
+        }
+
+        const prevWeek = result[index - 1];
+        const newUsers = week.activeUsersCount - prevWeek.activeUsersCount;
+        const churnedUsers = Math.max(0, prevWeek.activeUsersCount - week.activeUsersCount + newUsers);
+        const changePercentage = ((week.activeUsersCount - prevWeek.activeUsersCount) / prevWeek.activeUsersCount) * 100;
+        const turnoverRate = (churnedUsers / prevWeek.activeUsersCount) * 100;
+
+        return {
+            week: week.week,
+            year: week.year,
+            activeUsers: week.activeUsersCount,
+            newUsers: Math.max(0, newUsers),
+            churnedUsers,
+            changePercentage,
+            turnoverRate
+        };
+    });
+
+    return { kpi: 'Weekly User Turnover', data: weeklyTurnover };
 }
 
 async function calculateChurnRate(startDate, endDate) {
@@ -356,8 +291,8 @@ async function calculateChurnRate(startDate, endDate) {
         {
             $group: {
                 _id: {
-                    month: { $month: "$datetime" },
-                    year: { $year: "$datetime" }
+                    month: { $month: "$created_at" },
+                    year: { $year: "$created_at" }
                 },
                 activeUsers: { $addToSet: "$email" }
             }
@@ -432,23 +367,53 @@ async function calculateFeatureUseFrequencySaveSources(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
-                "interaction.interaction": "saved_source"
+                "sources.datetime": { $gte: new Date(startDate), $lte: new Date(endDate) }
+            }
+        },
+        {
+            $unwind: "$sources"
+        },
+        {
+            $match: {
+                "sources.datetime": { $gte: new Date(startDate), $lte: new Date(endDate) }
             }
         },
         {
             $group: {
-                _id: "$email",
-                savedSourcesCount: { $sum: 1 }
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$sources.datetime" } },
+                totalSourcesSaved: { $sum: 1 },
+                uniqueUsers: { $addToSet: "$_id" }
             }
         },
         {
-            $sort: { savedSourcesCount: -1 }
+            $project: {
+                date: "$_id",
+                totalSourcesSaved: 1,
+                uniqueUsers: { $size: "$uniqueUsers" },
+                averageSourcesSaved: {
+                    $cond: [
+                        { $eq: [{ $size: "$uniqueUsers" }, 0] },
+                        0,
+                        { $divide: ["$totalSourcesSaved", { $size: "$uniqueUsers" }] }
+                    ]
+                }
+            }
+        },
+        {
+            $sort: { date: 1 }
         }
     ];
- 
-    const result = await FeatureInteraction.aggregate(pipeline);
-    return { kpi: 'Feature Use Frequency (Save Sources)', data: result };
+
+    const result = await User.aggregate(pipeline);
+    return { 
+        kpi: 'Feature Use Frequency (Save Sources)', 
+        data: result.map(day => ({
+            date: day.date,
+            totalSourcesSaved: day.totalSourcesSaved,
+            uniqueUsers: day.uniqueUsers,
+            averageSourcesSaved: parseFloat(day.averageSourcesSaved.toFixed(2))
+        }))
+    };
 }
 
 async function calculateFeatureUseFrequencyPrimaryLiteratureVsSource(startDate, endDate) {
