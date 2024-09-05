@@ -582,6 +582,21 @@ exports.delete_images = async (req, res) => {
   }
 };
 
+exports.approve_images = async (req, res) => {
+  const { sourceIds } = req.body;
+  try {
+    const sources = await imageSource.find({ _id: { $in: sourceIds } });
+    for (const source of sources) {
+      source['status'] = 'active';
+      await source.save();
+    }
+    res.status(200).json({ message: "Images status updated to 'active' successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to approve images" });
+  }
+} 
+
 exports.getPipelineStatus = async (req, res) => {
   try {
     const response = await axios.get(`${PIPELINE_API_URL}/status`);
