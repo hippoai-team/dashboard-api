@@ -135,8 +135,14 @@ async function weeklyUserEngagement(startDate, endDate) {
         {
             $group: {
                 _id: {
-                    week: { $week: "$created_at" },
-                    year: { $year: "$created_at" }
+                    week: {
+                        $floor: {
+                            $divide: [
+                                { $subtract: ["$created_at", new Date(startDate)] },
+                                1000 * 60 * 60 * 24 * 7
+                            ]
+                        }
+                    }
                 },
                 totalQueries: { $sum: { $size: "$chat_history" } },
                 uniqueUsers: { $addToSet: "$email" }
@@ -145,7 +151,6 @@ async function weeklyUserEngagement(startDate, endDate) {
         {
             $project: {
                 week: "$_id.week",
-                year: "$_id.year",
                 totalQueries: 1,
                 uniqueUsers: { $size: "$uniqueUsers" },
                 queriesPerUser: { 
@@ -158,7 +163,7 @@ async function weeklyUserEngagement(startDate, endDate) {
             }
         },
         {
-            $sort: { "year": 1, "week": 1 }
+            $sort: { "week": 1 }
         }
     ];
 
@@ -174,9 +179,14 @@ async function weeklyUserEngagement(startDate, endDate) {
             ? ((week.queriesPerUser - prevWeek.queriesPerUser) / prevWeek.queriesPerUser) * 100
             : 0;
 
+        const weekStartDate = new Date(startDate);
+        weekStartDate.setDate(weekStartDate.getDate() + week.week * 7);
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 6);
+
         return {
-            week: week.week,
-            year: week.year,
+            weekStart: weekStartDate.toISOString().split('T')[0],
+            weekEnd: weekEndDate.toISOString().split('T')[0],
             queriesPerUser: week.queriesPerUser,
             changeInQueriesPerUser,
             percentageChange
@@ -227,19 +237,24 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
         {
             $group: {
                 _id: {
-                    week: { $week: "$created_at" },
-                    year: { $year: "$created_at" }
+                    week: {
+                        $floor: {
+                            $divide: [
+                                { $subtract: ["$created_at", new Date(startDate)] },
+                                1000 * 60 * 60 * 24 * 7
+                            ]
+                        }
+                    }
                 },
                 activeUsers: { $addToSet: "$email" }
             }
         },
         {
-            $sort: { "_id.year": 1, "_id.week": 1 }
+            $sort: { "_id.week": 1 }
         },
         {
             $project: {
                 week: "$_id.week",
-                year: "$_id.year",
                 activeUsersCount: { $size: "$activeUsers" }
             }
         }
@@ -248,10 +263,15 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
     const result = await ChatLog.aggregate(pipeline);
 
     const weeklyTurnover = result.map((week, index) => {
+        const weekStartDate = new Date(startDate);
+        weekStartDate.setDate(weekStartDate.getDate() + week.week * 7);
+        const weekEndDate = new Date(weekStartDate);
+        weekEndDate.setDate(weekEndDate.getDate() + 6);
+
         if (index === 0) {
             return {
-                week: week.week,
-                year: week.year,
+                weekStart: weekStartDate.toISOString().split('T')[0],
+                weekEnd: weekEndDate.toISOString().split('T')[0],
                 activeUsers: week.activeUsersCount,
                 newUsers: week.activeUsersCount,
                 churnedUsers: 0,
@@ -261,16 +281,16 @@ async function calculateUserTurnoverRateWeekly(startDate, endDate) {
         }
 
         const prevWeek = result[index - 1];
-        const newUsers = week.activeUsersCount - prevWeek.activeUsersCount;
+        const newUsers = Math.max(0, week.activeUsersCount - prevWeek.activeUsersCount);
         const churnedUsers = Math.max(0, prevWeek.activeUsersCount - week.activeUsersCount + newUsers);
         const changePercentage = ((week.activeUsersCount - prevWeek.activeUsersCount) / prevWeek.activeUsersCount) * 100;
         const turnoverRate = (churnedUsers / prevWeek.activeUsersCount) * 100;
 
         return {
-            week: week.week,
-            year: week.year,
+            weekStart: weekStartDate.toISOString().split('T')[0],
+            weekEnd: weekEndDate.toISOString().split('T')[0],
             activeUsers: week.activeUsersCount,
-            newUsers: Math.max(0, newUsers),
+            newUsers,
             churnedUsers,
             changePercentage,
             turnoverRate
