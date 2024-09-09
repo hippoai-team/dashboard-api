@@ -585,17 +585,21 @@ exports.delete_images = async (req, res) => {
 exports.approve_images = async (req, res) => {
   const { sourceIds } = req.body;
   try {
-    const sources = await imageSource.find({ _id: { $in: sourceIds } });
-    for (const source of sources) {
-      source['status'] = 'active';
-      await source.save();
+    const result = await imageSource.updateMany(
+      { _id: { $in: sourceIds } },
+      { $set: { status: 'active' } }
+    );
+
+    if (result.nModified > 0) {
+      res.status(200).json({ message: `${result.nModified} images approved successfully.` });
+    } else {
+      res.status(200).json({ message: "No images were updated. They may already be approved." });
     }
-    res.status(200).json({ message: "Images status updated to 'active' successfully." });
   } catch (error) {
-    console.error(error);
+    console.error("Error approving images:", error);
     res.status(500).json({ error: "Failed to approve images" });
   }
-} 
+};
 
 exports.getPipelineStatus = async (req, res) => {
   try {
