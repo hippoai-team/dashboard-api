@@ -5,8 +5,9 @@ const User = require('../models/userModel');
 
 exports.index = async (req, res) => {
     try {
-        const { kpi, startDate, endDate } = req.query;
+        const { kpi, startDate, endDate, bins } = req.query;
         let result;
+        let customBins = bins ? bins.split(',').map(Number) : null;
 
         switch (kpi) {
             case 'averageDailyQueries':
@@ -37,10 +38,10 @@ exports.index = async (req, res) => {
                 result = await calculateFeatureInteractionCountForCalculator(startDate, endDate);
                 break;
             case 'averageDailyQueriesDistribution':
-                result = await calculateAverageDailyQueriesDistribution(startDate, endDate);
+                result = await calculateAverageDailyQueriesDistribution(startDate, endDate, customBins);
                 break;
             case 'tokenUsageDistribution':
-                result = await calculateTokenUsageDistribution(startDate, endDate);
+                result = await calculateTokenUsageDistribution(startDate, endDate, customBins);
                 break;
             
             default:
@@ -562,8 +563,8 @@ async function calculateFeatureInteractionCountForCalculator(startDate, endDate)
     };
 }
 
-async function calculateAverageDailyQueriesDistribution(startDate, endDate) {
-    const boundaries = [0, 1, 4, 10, 20, 50, 100, Infinity];
+async function calculateAverageDailyQueriesDistribution(startDate, endDate, customBins) {
+    const boundaries = customBins || [0, 1, 4, 10, 20, 50, 100, Infinity];
     const pipeline = [
         {
             $match: {
@@ -593,7 +594,7 @@ async function calculateAverageDailyQueriesDistribution(startDate, endDate) {
             $bucket: {
                 groupBy: "$averageDailyQueries",
                 boundaries: boundaries,
-                default: "100+",
+                default: "Other",
                 output: {
                     count: { $sum: 1 },
                     users: { $push: "$_id" }
@@ -627,7 +628,9 @@ async function calculateAverageDailyQueriesDistribution(startDate, endDate) {
 
 
 
-async function calculateTokenUsageDistribution(startDate, endDate) {
+async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
+    const defaultBins = [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity];
+    const boundaries = customBins || defaultBins;
     const pipeline = [
         {
             $match: {
@@ -656,8 +659,8 @@ async function calculateTokenUsageDistribution(startDate, endDate) {
                     {
                         $bucket: {
                             groupBy: "$totalTokensIn",
-                            boundaries: [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity],
-                            default: "500000+",
+                            boundaries: boundaries,
+                            default: "Other",
                             output: {
                                 count: { $sum: 1 },
                                 users: { $push: "$_id" }
@@ -669,8 +672,8 @@ async function calculateTokenUsageDistribution(startDate, endDate) {
                     {
                         $bucket: {
                             groupBy: "$totalTokensOut",
-                            boundaries: [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity],
-                            default: "500000+",
+                            boundaries: boundaries,
+                            default: "Other",
                             output: {
                                 count: { $sum: 1 },
                                 users: { $push: "$_id" }
@@ -682,8 +685,8 @@ async function calculateTokenUsageDistribution(startDate, endDate) {
                     {
                         $bucket: {
                             groupBy: "$totalTokens",
-                            boundaries: [0, 2000, 10000, 20000, 100000, 200000, 1000000, Infinity],
-                            default: "1000000+",
+                            boundaries: boundaries,
+                            default: "Other",
                             output: {
                                 count: { $sum: 1 },
                                 users: { $push: "$_id" }
