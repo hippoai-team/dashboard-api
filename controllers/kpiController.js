@@ -36,6 +36,12 @@ exports.index = async (req, res) => {
             case 'featureInteractionRateCalculator':
                 result = await calculateFeatureInteractionCountForCalculator(startDate, endDate);
                 break;
+            case 'averageDailyQueriesDistribution':
+                result = await calculateAverageDailyQueriesDistribution(startDate, endDate);
+                break;
+            case 'tokenUsageDistribution':
+                result = await calculateTokenUsageDistribution(startDate, endDate);
+                break;
             
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
@@ -556,6 +562,142 @@ async function calculateFeatureInteractionCountForCalculator(startDate, endDate)
     };
 }
 
+async function calculateAverageDailyQueriesDistribution(startDate, endDate) {
+    const boundaries = [0, 1, 4, 10, 20, 50, 100, Infinity];
+    const pipeline = [
+        {
+            $match: {
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role: 'user'
+            }
+        },
+        {
+            $group: {
+                _id: "$email",
+                totalQueries: { $sum: { $size: "$chat_history" } },
+                uniqueDays: { $addToSet: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } } }
+            }
+        },
+        {
+            $project: {
+                averageDailyQueries: {
+                    $cond: [
+                        { $eq: [{ $size: "$uniqueDays" }, 0] },
+                        0,
+                        { $divide: ["$totalQueries", { $size: "$uniqueDays" }] }
+                    ]
+                }
+            }
+        },
+        {
+            $bucket: {
+                groupBy: "$averageDailyQueries",
+                boundaries: boundaries,
+                default: "100+",
+                output: {
+                    count: { $sum: 1 },
+                    users: { $push: "$_id" }
+                }
+            }
+        },
+        {
+            $project: {
+                min: "$_id",
+                max: {
+                    $switch: {
+                        branches: boundaries.slice(0, -1).map((boundary, index) => ({
+                            case: { $eq: ["$_id", boundary] },
+                            then: boundaries[index + 1]
+                        })),
+                        default: "Infinity"
+                    }
+                },
+                count: 1,
+                users: 1
+            }
+        },
+        {
+            $sort: { min: 1 }
+        }
+    ];
+
+    const result = await ChatLog.aggregate(pipeline);
+    return { kpi: 'Average Daily Queries Distribution', data: result };
+}
+
+
+
+async function calculateTokenUsageDistribution(startDate, endDate) {
+    const pipeline = [
+        {
+            $match: {
+                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role: 'user'
+            }
+        },
+        {
+            $unwind: "$chat_history"
+        },
+        {
+            $group: {
+                _id: "$email",
+                totalTokensIn: { $sum: "$chat_history.tokenSummary.in" },
+                totalTokensOut: { $sum: "$chat_history.tokenSummary.out" }
+            }
+        },
+        {
+            $project: {
+                totalTokens: { $add: ["$totalTokensIn", "$totalTokensOut"] }
+            }
+        },
+        {
+            $facet: {
+                tokensInDistribution: [
+                    {
+                        $bucket: {
+                            groupBy: "$totalTokensIn",
+                            boundaries: [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity],
+                            default: "500000+",
+                            output: {
+                                count: { $sum: 1 },
+                                users: { $push: "$_id" }
+                            }
+                        }
+                    }
+                ],
+                tokensOutDistribution: [
+                    {
+                        $bucket: {
+                            groupBy: "$totalTokensOut",
+                            boundaries: [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity],
+                            default: "500000+",
+                            output: {
+                                count: { $sum: 1 },
+                                users: { $push: "$_id" }
+                            }
+                        }
+                    }
+                ],
+                totalTokensDistribution: [
+                    {
+                        $bucket: {
+                            groupBy: "$totalTokens",
+                            boundaries: [0, 2000, 10000, 20000, 100000, 200000, 1000000, Infinity],
+                            default: "1000000+",
+                            output: {
+                                count: { $sum: 1 },
+                                users: { $push: "$_id" }
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ];
+
+    const result = await ChatLog.aggregate(pipeline);
+    return { kpi: 'Token Usage Distribution', data: result[0] };
+}
 
 async function calculateUserConversionRate(startDate, endDate) {
     const pipeline = [
