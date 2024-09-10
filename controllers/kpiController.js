@@ -43,7 +43,9 @@ exports.index = async (req, res) => {
             case 'tokenUsageDistribution':
                 result = await calculateTokenUsageDistribution(startDate, endDate, customBins);
                 break;
-            
+            case 'newUserSignups':
+                result = await calculateNewUserSignups(startDate, endDate);
+                break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
@@ -629,7 +631,7 @@ async function calculateAverageDailyQueriesDistribution(startDate, endDate, cust
 
 
 async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
-    const defaultBins = [0, 1000, 5000, 10000, 50000, 100000, 500000, Infinity];
+    const defaultBins = [0, 100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 50000, 60000, Infinity];
     const boundaries = customBins || defaultBins;
     const pipeline = [
         {
@@ -642,15 +644,10 @@ async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
             $unwind: "$chat_history"
         },
         {
-            $group: {
-                _id: "$email",
-                totalTokensIn: { $sum: "$chat_history.tokenSummary.in" },
-                totalTokensOut: { $sum: "$chat_history.tokenSummary.out" }
-            }
-        },
-        {
             $project: {
-                totalTokens: { $add: ["$totalTokensIn", "$totalTokensOut"] }
+                tokensIn: "$chat_history.tokenSummary.in",
+                tokensOut: "$chat_history.tokenSummary.out",
+                totalTokens: { $add: ["$chat_history.tokenSummary.in", "$chat_history.tokenSummary.out"] }
             }
         },
         {
@@ -658,12 +655,11 @@ async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
                 tokensInDistribution: [
                     {
                         $bucket: {
-                            groupBy: "$totalTokensIn",
+                            groupBy: "$tokensIn",
                             boundaries: boundaries,
                             default: "Other",
                             output: {
-                                count: { $sum: 1 },
-                                users: { $push: "$_id" }
+                                count: { $sum: 1 }
                             }
                         }
                     }
@@ -671,12 +667,11 @@ async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
                 tokensOutDistribution: [
                     {
                         $bucket: {
-                            groupBy: "$totalTokensOut",
+                            groupBy: "$tokensOut",
                             boundaries: boundaries,
                             default: "Other",
                             output: {
-                                count: { $sum: 1 },
-                                users: { $push: "$_id" }
+                                count: { $sum: 1 }
                             }
                         }
                     }
@@ -688,12 +683,63 @@ async function calculateTokenUsageDistribution(startDate, endDate, customBins) {
                             boundaries: boundaries,
                             default: "Other",
                             output: {
-                                count: { $sum: 1 },
-                                users: { $push: "$_id" }
+                                count: { $sum: 1 }
                             }
                         }
                     }
                 ]
+            }
+        },
+        {
+            $project: {
+                tokensInDistribution: {
+                    $map: {
+                        input: "$tokensInDistribution",
+                        as: "bin",
+                        in: {
+                            min: "$$bin._id",
+                            max: {
+                                $let: {
+                                    vars: { index: { $indexOfArray: [boundaries, "$$bin._id"] } },
+                                    in: { $arrayElemAt: [boundaries, { $add: ["$$index", 1] }] }
+                                }
+                            },
+                            count: "$$bin.count"
+                        }
+                    }
+                },
+                tokensOutDistribution: {
+                    $map: {
+                        input: "$tokensOutDistribution",
+                        as: "bin",
+                        in: {
+                            min: "$$bin._id",
+                            max: {
+                                $let: {
+                                    vars: { index: { $indexOfArray: [boundaries, "$$bin._id"] } },
+                                    in: { $arrayElemAt: [boundaries, { $add: ["$$index", 1] }] }
+                                }
+                            },
+                            count: "$$bin.count"
+                        }
+                    }
+                },
+                totalTokensDistribution: {
+                    $map: {
+                        input: "$totalTokensDistribution",
+                        as: "bin",
+                        in: {
+                            min: "$$bin._id",
+                            max: {
+                                $let: {
+                                    vars: { index: { $indexOfArray: [boundaries, "$$bin._id"] } },
+                                    in: { $arrayElemAt: [boundaries, { $add: ["$$index", 1] }] }
+                                }
+                            },
+                            count: "$$bin.count"
+                        }
+                    }
+                }
             }
         }
     ];
@@ -810,3 +856,44 @@ async function calculateUserConversionRate(startDate, endDate) {
         data: result.length > 0 ? result[0].conversionRate : 0
     };
 }
+
+async function calculateNewUserSignups(startDate, endDate) {
+    const pipeline = [
+        {
+            $match: {
+                signup_date: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role: 'user'
+            }
+        },
+        {
+            $group: {
+                _id: "$email",
+                signupDate: { $min: "$signup_date" }
+            }
+        },
+        {
+            $group: {
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$signupDate" } },
+                count: { $sum: 1 }
+            }
+        },
+        {
+            $sort: { _id: 1 }
+        },
+        {
+            $project: {
+                _id: 0,
+                date: "$_id",
+                count: 1
+            }
+        }
+    ];
+
+    const result = await User.aggregate(pipeline);
+    return {
+        kpi: 'New User Signups',
+        data: result
+    };
+}
+
+
