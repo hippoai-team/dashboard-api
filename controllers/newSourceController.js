@@ -29,7 +29,8 @@ const source_type_list = {
   'drug_monographs': drug_monographs_master,
 };
 
-const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'https://pendiumdev.com/pipeline';
+//const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'https://pendiumdev.com/pipeline';
+const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline-no-pdf'
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
     Bucket: bucketName,
