@@ -41,7 +41,7 @@ exports.index = async (req, res) => {
             endDate.setMonth(endDate.getMonth() + 1);
             query.timestamp = { $gte: startDate, $lt: endDate };
         }
-        //total usage enrtries this month
+        //total usage entries this month
         const totalUsageEntries = await UsageEntry.countDocuments(query);
         if (customer_key) {
             query.api_key = customer_key;
@@ -77,9 +77,6 @@ exports.index = async (req, res) => {
                 entry.total_input_cost = entry.total_input_count * modelPricing[model].input;
                 entry.total_output_cost = entry.total_output_count * modelPricing[model].output;
             });
-
-            
-           
         }
         const query_logs = {};
 
@@ -87,7 +84,7 @@ exports.index = async (req, res) => {
             const startDate = new Date(month);
             const endDate = new Date(month);
             endDate.setMonth(endDate.getMonth() + 1);
-            query_logs.datetime = { $gte: startDate, $lt: endDate };
+            query_logs.timestamp = { $gte: startDate, $lt: endDate };
         }
 
         //total chat logs this month
@@ -101,11 +98,10 @@ exports.index = async (req, res) => {
        
         const chatLogs = await BackendChatLog.find(query_logs).sort({ timestamp: -1 }).skip(skip).limit(perPage);
 
-     
-
         //return api customers and usage entries
 
         const data = { apiCustomers, usageEntries, chatLogs, months, totalUsagePercentageForSelectedCustomer};
+        console.log('data', data);
         res.status(200).json(data);
     }
     catch (error) {

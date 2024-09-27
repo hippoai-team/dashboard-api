@@ -46,6 +46,9 @@ exports.index = async (req, res) => {
             case 'newUserSignups':
                 result = await calculateNewUserSignups(startDate, endDate);
                 break;
+            case 'featureInteractionsPerDay':
+                result = await calculateFeatureInteractionsPerDay(startDate, endDate);
+                break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
@@ -57,6 +60,62 @@ exports.index = async (req, res) => {
     }
 };
 
+async function calculateFeatureInteractionsPerDay(startDate, endDate) {
+    const pipeline = [
+        {
+            $match: {
+                timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
+            }
+        },
+        {
+            $group: {
+                _id: {
+                    date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+                    interaction: "$interaction.interaction"
+                },
+                count: { $sum: 1 }
+            }
+        },
+        {
+            $match: {
+                count: { $gt: 0 }
+            }
+        },
+        {
+            $group: {
+                _id: "$_id.date",
+                interactions: {
+                    $push: {
+                        interaction: "$_id.interaction",
+                        count: "$count"
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                date: "$_id",
+                interactions: 1
+            }
+        },
+        {
+            $sort: { date: 1 }
+        }
+    ];
+
+    const result = await FeatureInteraction.aggregate(pipeline);
+    return { 
+        kpi: 'Feature Interactions Per Day', 
+        data: result.map(day => ({
+            date: day.date,
+            interactions: day.interactions.reduce((acc, curr) => {
+                acc[curr.interaction] = curr.count;
+                return acc;
+            }, {})
+        }))
+    };
+}
 async function calculateAverageDailyQueries(startDate, endDate) {
     const pipeline = [
         {
@@ -893,6 +952,58 @@ async function calculateNewUserSignups(startDate, endDate) {
     return {
         kpi: 'New User Signups',
         data: result
+    };
+}
+
+async function calculateFeatureInteractionsPerDay(startDate, endDate) {
+    const pipeline = [
+        {
+            $match: {
+                timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
+            }
+        },
+        {
+            $group: {
+                _id: {
+                    date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+                    interaction: "$interaction.interaction"
+                },
+                count: { $sum: 1 }
+            }
+        },
+        {
+            $group: {
+                _id: "$_id.date",
+                interactions: {
+                    $push: {
+                        interaction: "$_id.interaction",
+                        count: "$count"
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                date: "$_id",
+                interactions: 1
+            }
+        },
+        {
+            $sort: { date: 1 }
+        }
+    ];
+
+    const result = await FeatureInteraction.aggregate(pipeline);
+    return { 
+        kpi: 'Feature Interactions Per Day', 
+        data: result.map(day => ({
+            date: day.date,
+            interactions: day.interactions.reduce((acc, curr) => {
+                acc[curr.interaction] = curr.count;
+                return acc;
+            }, {})
+        }))
     };
 }
 
