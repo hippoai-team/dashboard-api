@@ -2,218 +2,108 @@ const User = require('../models/userModel');
 const ChatLog = require('../models/chatLog');
 const BetaUser = require('../models/BetaUser');
 const moment = require('moment');
+const Stripe = require("stripe");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 exports.index = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1; // Get the requested page or default to page 1
-        const perPage = parseInt(req.query.perPage) || 10; // Get the requested number of items per page or default to 10
-        // Calculate the skip value based on the requested page
+        const page = parseInt(req.query.page) || 1;
+        const perPage = parseInt(req.query.perPage) || 10;
         const skip = (page - 1) * perPage;
     
-        // Initializing the search query 
         let query = {}
 
         const search = req.query.search || "";
-    if (search) {
-      const regexSearch = { $regex: search, $options: "i" };
-
-      const searchQueries = [
-        { email: regexSearch },
-        { status: regexSearch },
-        {name: regexSearch},
-      ];
-    
-        query.$or = searchQueries;
-    }
-
-    
-
-    const userGroupFilter = req.query.userGroupFilter || "";
-    if (userGroupFilter) {
-        if (userGroupFilter==='beta') {
-          const activeBetaUsers = await BetaUser.find({});
-          const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
-          query.email = { $in: activeBetaUsersEmails };
+        if (search) {
+            const regexSearch = { $regex: search, $options: "i" };
+            query.$or = [
+                { email: regexSearch },
+                { status: regexSearch },
+                { name: regexSearch },
+            ];
         }
-        //if in cohort A-D or None
-        else if (['A','B','C','D','none'].includes(userGroupFilter)) {
-  
-          const activeBetaUsers = await BetaUser.find({cohort: userGroupFilter});
-          const activeBetaUsersEmails = activeBetaUsers.map(user => user.email);
-          query.email = { $in: activeBetaUsersEmails };
-        }
-        else if (userGroupFilter==='all') {
-          //do nothing
-        }
-        else {
-        }
-          }
-    const userFilter = req.query.userFilter || "";
-          if (userFilter) {
-              query.email = userFilter; // Add the user filter to the query object
-              }
-    
-    const statusFilter = req.query.statusFilter || "";
 
-    if (statusFilter) {
-        query.status = statusFilter; // Add the status filter to the query object
-        }
-    
-    const dateRangeFilter = req.query.dateRange || "last_week";
-    const totalUsers = await User.countDocuments(query); // Count the total number of users
-   /* const chatLogs = await ChatLog.find(query, {email: 1, datetime: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } } });
-    const dailyActiveUsers = {};
-    const dateRangeStart = req.query.dateRangeStart || "";
-    const dateRangeEnd = req.query.dateRangeEnd || "";
+        const totalUsers = await User.countDocuments(query);
 
-    let dateRangeValues = ['last_week', 'last_month', 'last_year', 'all_time'];
-    let startDate;
-    let endDate;
-    if (dateRangeStart && dateRangeEnd) {
-      startDate = new Date(dateRangeStart);
-      endDate = new Date(dateRangeEnd);
+        const users = await User.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'chat_logs_hippo',
+                    localField: 'email',
+                    foreignField: 'email',
+                    as: 'chatLogs'
+                }
+            },
+            {
+                $project: {
+                    email: 1,
+                    name: 1,
+                    profession: 1,
+                    signup_date: 1,
+                    stripeCustomerId: 1,
+                    threadCount: { 
+                        $size: { 
+                            $ifNull: [
+                                { $setUnion: "$chatLogs.thread_uuid" },
+                                []
+                            ]
+                        } 
+                    },
+                    sourcesCount: { 
+                        $size: { 
+                            $ifNull: ["$sources", []]
+                        } 
+                    }
+                }
+            },
+            { $sort: { signup_date: -1 } },
+            { $skip: skip },
+            { $limit: perPage }
+        ]);
 
-      endDate.setDate(endDate.getDate()); // Add one day to the end date
-    } else if (dateRangeFilter && dateRangeValues.includes(dateRangeFilter)) {
-      let dateRangeResult = setDateRange(dateRangeFilter);
-      startDate = dateRangeResult.startDate;
-      endDate = dateRangeResult.endDate;
+        // Fetch subscription information for users with a Stripe customer ID
+        const usersWithSubscriptions = await Promise.all(users.map(async (user) => {
+            if (user.stripeCustomerId) {
+                try {
+                    const subscriptions = await stripe.subscriptions.list({
+                        customer: user.stripeCustomerId,
+                        limit: 1
+                    });
 
-    }
-
-      chatLogs.forEach(log => {
-        if (log.datetime >= startDate && log.datetime <= endDate) {
-            if (!dailyActiveUsers[log.datetime]) {
-                dailyActiveUsers[log.datetime] = new Set();
+                    if (subscriptions.data.length > 0) {
+                        const subscription = subscriptions.data[0];
+                        const product = await stripe.products.retrieve(subscription.plan.product);
+                        user.activeSubscriptionName = product.name;
+                        user.activeSubscriptionStatus = subscription.status;
+                    } else {
+                        user.activeSubscriptionName = null;
+                        user.activeSubscriptionStatus = null;
+                    }
+                } catch (error) {
+                    console.error(`Error fetching subscription for user ${user.email}:`, error);
+                    user.activeSubscriptionName = 'Error fetching subscription';
+                    user.activeSubscriptionStatus = 'Error fetching subscription';
+                }
+            } else {
+                user.activeSubscriptionName = null;
+                user.activeSubscriptionStatus = null;
             }
-            dailyActiveUsers[log.datetime].add(log.email);
-        }
-    });
-    for (const datetime in dailyActiveUsers) {
-        dailyActiveUsers[datetime] = {count: dailyActiveUsers[datetime].size, users: Array.from(dailyActiveUsers[datetime])};
+            return user;
+        }));
+
+        const data = {
+            users: usersWithSubscriptions,
+            totalUsers,
+        };
+        res.status(200).json(data);
+
+    } catch (error) {
+        console.error('Error in index function:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-    const dailyActiveUsersDescription = `The number of active users per day for cohort:'${req.query.userGroupFilter}' in the ${dateRangeFilter}.`;
-    const weeklyActiveUsers = {};
-
-    
-    for (const datetime in dailyActiveUsers) {
-        const week = moment(datetime).startOf('week').format('YYYY-MM-DD');
-        if (!weeklyActiveUsers[week]) {
-            weeklyActiveUsers[week] = new Set();
-        }
-        dailyActiveUsers[datetime].users.forEach(user => {
-            weeklyActiveUsers[week].add(user);
-        });
-    }
-    for (const week in weeklyActiveUsers) {
-        weeklyActiveUsers[week] = {count: weeklyActiveUsers[week].size, users: Array.from(weeklyActiveUsers[week])};
-    }
-    const weeklyActiveUsersDescription = `Active users per week and change for previous week for cohort:'${req.query.userGroupFilter}' in the ${dateRangeFilter}.`;
-*/
-    //sum usage field from all users in query
-  /*  const totalUsage = await User.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: { $add: ["$usage", "$follow_up_usage"] } } } }
-      ]).allowDiskUse(true);
-    const totalUsageDescription = `The total usage for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalUsage[0].total}.`;
-    const totalUsageCount = totalUsage.length ? totalUsage[0].total : 0;
-*/
-    /*const totalFeedback = await User.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: "$feedback_count" } } }
-      ]).allowDiskUse(true);
-    const totalFeedbackDescription = `The total feedback for users in cohort:'${req.query.userGroupFilter}' in the query is ${totalFeedback[0].total}.`;
-    const totalFeedbackCount = totalFeedback.length ? totalFeedback[0].total : 0;
-*/
-
-    //preset range filter
-
-   //const { totalChurnRate, churnPerWeek, churnDescription,inactiveUsers } = await calculateChurn(dateRangeFilter, User, ChatLog, BetaUser, req.query.userGroupFilter);
-   /* const churnData = {
-        totalChurnRate,
-        churnPerWeek,
-        inactiveUsers
-    };*/
-    //const { queriesByUserAndWeek, weekOverWeekChanges, weeklyTurnOverRateDescription } = await calculateUserTurnoverRate(req.query.userGroupFilter, BetaUser, ChatLog);
-    //send back data
- 
-    /*const savedSources = await User.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: { $cond: { if: { $isArray: "$sources" }, then: { $size: "$sources" }, else: 0 } } } } }
-      ]).allowDiskUse(true);
-    const totalSavedSources = savedSources.length ? savedSources[0].total : 0;
-    const clickedSources = await User.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: { $ifNull: ["$sourceClickCount", 0] } } } }
-      ]).allowDiskUse(true);
-    const totalClickedSources = clickedSources.length ? clickedSources[0].total : 0;
-    const followUpCount = await User.aggregate([
-        { $match: query },
-        { $group: { _id: null, total: { $sum: { $ifNull: ["$follow_up_usage", 0] } } } }
-
-    ]).allowDiskUse(true);
-    const totalFollowUpCount = followUpCount.length ? followUpCount[0].total : 0;*/
-
-    const users = await User.aggregate([
-      { $match: query },
-      { $sort: { signup_date: -1 } }, // Sorting by signup_date before skipping and limiting
-      { $skip: skip },
-      { $limit: perPage },
-      {
-        $project: {
-          email: 1,
-          name: 1,
-          status: 1,
-          signup_date: 1,
-          usage: 1,
-          feedback_count: 1,
-          clicked_sources: 1,
-          sourceClickCount: 1,
-          follow_up_usage: 1,
-          nav_threads: 1,
-          nav_saved_sources: 1,
-          num_logins: 1,
-          sources: 1 // Include sources array for further processing
-        }
-      }
-    ]);
-    /*const descriptions = {
-        dailyActiveUsersDescription,
-        weeklyActiveUsersDescription,
-        totalUsageDescription,
-        totalFeedbackDescription,
-        weeklyTurnOverRateDescription,
-        churnDescription
-    };*/
-
-    const data = {
-        users,
-        totalUsers,
-        //totalUsageCount,
-        //totalFeedbackCount,
-        //dailyActiveUsers,
-        //weeklyActiveUsers,
-        //churnData,
-        //queriesByUserAndWeek,
-        //weekOverWeekChanges,
-        //descriptions,
-       // totalSavedSources,
-        //totalClickedSources,
-       // totalFollowUpCount,
-       // savedSourceTypeCounts
-
-    };
-    res.status(200).json(data);
-
-
-}
-catch (error) {
-    console.log(error);
-    res.status(500).json({ error: error.message });
-}
 };
-
-
 
 exports.show = async (req, res) => {
     try {

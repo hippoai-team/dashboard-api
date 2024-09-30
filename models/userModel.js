@@ -1,4 +1,4 @@
-// models/Book.js
+// models/userModel.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -23,10 +23,6 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: null
   },
-  threads: {
-    type: Array,
-    default: []
-  },
   sources: {
     type: Array,
     default: []
@@ -47,39 +43,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'active'
   },
-  usage: {
-    type: Number,
-    default: 0
-  },
-  feedback_count: {
-    type: Number,
-    default: 0
-  },
-  follow_up_usage: {
-    type: Number,
-    default: 0
-  },
-  clicked_sources: {
-    type: Array,
-    default: []
-  },
-  sourceClickCount: {
-    type: Number,
-    default: 0
-  },
-  nav_threads: {
-    type: Number,
-    default: 0
-  },
-  nav_saved_sources: {
-    type: Number,
-    default: 0
-  },
   role: {
     type: String,
     default: 'user'
   },
+  stripeCustomerId: {
+    type: String,
+    default: null
+  }
 });
 
 module.exports = mongoose.model('users', userSchema);
-

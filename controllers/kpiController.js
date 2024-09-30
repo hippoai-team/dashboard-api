@@ -2,6 +2,10 @@ const ChatLog = require('../models/chatLog');
 const FeatureInteraction = require('../models/FeatureInteraction');
 const UserFeedback = require('../models/UserFeedback');
 const User = require('../models/userModel');
+const moment = require('moment-timezone');
+
+// Helper function to convert dates to EST
+const toEST = (date) => moment(date).tz('America/New_York').format();
 
 exports.index = async (req, res) => {
     try {
@@ -9,50 +13,54 @@ exports.index = async (req, res) => {
         let result;
         let customBins = bins ? bins.split(',').map(Number) : null;
 
+        // Convert start and end dates to EST
+        const estStartDate = toEST(startDate);
+        const estEndDate = toEST(endDate);
+
         switch (kpi) {
             case 'averageDailyQueries':
-                result = await calculateAverageDailyQueries(startDate, endDate);
+                result = await calculateAverageDailyQueries(estStartDate, estEndDate);
                 break;
             case 'dailyActiveUsers':
-                result = await calculateDailyActiveUsers(startDate, endDate);
+                result = await calculateDailyActiveUsers(estStartDate, estEndDate);
                 break;
             case 'weeklyUserEngagement':
-                result = await weeklyUserEngagement(startDate, endDate);
+                result = await weeklyUserEngagement(estStartDate, estEndDate);
                 break;
             case 'totalQueries':
-                result = await calculateTotalQueries(startDate, endDate);
+                result = await calculateTotalQueries(estStartDate, estEndDate);
                 break;
             case 'userTurnoverRateWeekly':
-                result = await calculateUserTurnoverRateWeekly(startDate, endDate);
+                result = await calculateUserTurnoverRateWeekly(estStartDate, estEndDate);
                 break;
             case 'churnRate':
-                result = await calculateChurnRate(startDate, endDate);
+                result = await calculateChurnRate(estStartDate, estEndDate);
                 break;
             case 'featureUseFrequencySaveSources':
-                result = await calculateFeatureUseFrequencySaveSources(startDate, endDate);
+                result = await calculateFeatureUseFrequencySaveSources(estStartDate, estEndDate);
                 break;
             case 'featureUseFrequencyPrimaryLiteratureVsSource':
-                result = await calculateFeatureUseFrequencyPrimaryLiteratureVsSource(startDate, endDate);
+                result = await calculateFeatureUseFrequencyPrimaryLiteratureVsSource(estStartDate, estEndDate);
                 break;
             case 'featureInteractionRateCalculator':
-                result = await calculateFeatureInteractionCountForCalculator(startDate, endDate);
+                result = await calculateFeatureInteractionCountForCalculator(estStartDate, estEndDate);
                 break;
             case 'averageDailyQueriesDistribution':
-                result = await calculateAverageDailyQueriesDistribution(startDate, endDate, customBins);
+                result = await calculateAverageDailyQueriesDistribution(estStartDate, estEndDate, customBins);
                 break;
             case 'tokenUsageDistribution':
-                result = await calculateTokenUsageDistribution(startDate, endDate, customBins);
+                result = await calculateTokenUsageDistribution(estStartDate, estEndDate, customBins);
                 break;
             case 'newUserSignups':
-                result = await calculateNewUserSignups(startDate, endDate);
+                result = await calculateNewUserSignups(estStartDate, estEndDate);
                 break;
             case 'featureInteractionsPerDay':
-                result = await calculateFeatureInteractionsPerDay(startDate, endDate);
+                result = await calculateFeatureInteractionsPerDay(estStartDate, estEndDate);
                 break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
-        console.log('result',result)
+        console.log('result', result);
         res.json(result);
     } catch (error) {
         console.error('Error in KPI calculation:', error);
@@ -60,73 +68,27 @@ exports.index = async (req, res) => {
     }
 };
 
-async function calculateFeatureInteractionsPerDay(startDate, endDate) {
-    const pipeline = [
-        {
-            $match: {
-                timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
-            }
-        },
-        {
-            $group: {
-                _id: {
-                    date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
-                    interaction: "$interaction.interaction"
-                },
-                count: { $sum: 1 }
-            }
-        },
-        {
-            $match: {
-                count: { $gt: 0 }
-            }
-        },
-        {
-            $group: {
-                _id: "$_id.date",
-                interactions: {
-                    $push: {
-                        interaction: "$_id.interaction",
-                        count: "$count"
-                    }
-                }
-            }
-        },
-        {
-            $project: {
-                _id: 0,
-                date: "$_id",
-                interactions: 1
-            }
-        },
-        {
-            $sort: { date: 1 }
-        }
-    ];
-
-    const result = await FeatureInteraction.aggregate(pipeline);
-    return { 
-        kpi: 'Feature Interactions Per Day', 
-        data: result.map(day => ({
-            date: day.date,
-            interactions: day.interactions.reduce((acc, curr) => {
-                acc[curr.interaction] = curr.count;
-                return acc;
-            }, {})
-        }))
-    };
-}
+// Update all the KPI calculation functions to use EST
 async function calculateAverageDailyQueries(startDate, endDate) {
     const pipeline = [
         {
             $match: {
-                created_at: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                created_at: { 
+                    $gte: new Date(startDate), 
+                    $lte: new Date(endDate) 
+                },
                 role: 'user'
             }
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+                _id: { 
+                    $dateToString: { 
+                        format: "%Y-%m-%d", 
+                        date: "$created_at",
+                        timezone: "America/New_York"
+                    } 
+                },
                 uniqueUsers: { $addToSet: "$email" },
                 totalQueries: { $sum: { $size: "$chat_history" } }
             }
@@ -165,7 +127,7 @@ async function calculateDailyActiveUsers(startDate, endDate) {
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: "America/New_York" } },
                 uniqueUsers: { $addToSet: "$email" }
             }
         },
@@ -274,7 +236,7 @@ async function calculateTotalQueries(startDate, endDate) {
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: "America/New_York" } },
                 totalQueries: { $sum: { $size: "$chat_history" } }
             }
         },
@@ -468,7 +430,7 @@ async function calculateFeatureUseFrequencySaveSources(startDate, endDate) {
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$sources.createdAt" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$sources.createdAt", timezone: "America/New_York" } },
                 totalSourcesSaved: { $sum: 1 },
                 uniqueUsers: { $addToSet: "$email" }
             }
@@ -522,7 +484,7 @@ async function calculateFeatureUseFrequencyPrimaryLiteratureVsSource(startDate, 
         },
         {
             $project: {
-                date: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } },
+                date: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: "America/New_York" } },
                 hasRelevantInteraction: {
                     $cond: {
                         if: {
@@ -598,7 +560,7 @@ async function calculateFeatureInteractionCountForCalculator(startDate, endDate)
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp", timezone: "America/New_York" } },
                 interactionCount: { $sum: 1 }
             }
         },
@@ -637,7 +599,7 @@ async function calculateAverageDailyQueriesDistribution(startDate, endDate, cust
             $group: {
                 _id: "$email",
                 totalQueries: { $sum: { $size: "$chat_history" } },
-                uniqueDays: { $addToSet: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } } }
+                uniqueDays: { $addToSet: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: "America/New_York" } } }
             }
         },
         {
@@ -833,7 +795,7 @@ async function calculateUserConversionRate(startDate, endDate) {
                     },
                     {
                         $group: {
-                            _id: { $dateToString: { format: "%Y-%m-%d", date: "$datetime" } },
+                            _id: { $dateToString: { format: "%Y-%m-%d", date: "$datetime", timezone: "America/New_York" } },
                             count: { $sum: 1 }
                         }
                     }
@@ -932,7 +894,7 @@ async function calculateNewUserSignups(startDate, endDate) {
         },
         {
             $group: {
-                _id: { $dateToString: { format: "%Y-%m-%d", date: "$signupDate" } },
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$signupDate", timezone: "America/New_York" } },
                 count: { $sum: 1 }
             }
         },
@@ -965,7 +927,7 @@ async function calculateFeatureInteractionsPerDay(startDate, endDate) {
         {
             $group: {
                 _id: {
-                    date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+                    date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp", timezone: "America/New_York" } },
                     interaction: "$interaction.interaction"
                 },
                 count: { $sum: 1 }
@@ -1006,5 +968,3 @@ async function calculateFeatureInteractionsPerDay(startDate, endDate) {
         }))
     };
 }
-
-
