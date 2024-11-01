@@ -57,6 +57,9 @@ exports.index = async (req, res) => {
             case 'featureInteractionsPerDay':
                 result = await calculateFeatureInteractionsPerDay(estStartDate, estEndDate);
                 break;
+            case 'userRetentionMetrics':
+                result = await calculateUserRetentionMetrics(estStartDate, estEndDate);
+                break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
@@ -77,7 +80,8 @@ async function calculateAverageDailyQueries(startDate, endDate) {
                     $gte: new Date(startDate), 
                     $lte: new Date(endDate) 
                 },
-                role: 'user'
+                role: 'user',
+                chat_history: { $exists: true, $ne: null }
             }
         },
         {
@@ -90,14 +94,22 @@ async function calculateAverageDailyQueries(startDate, endDate) {
                     } 
                 },
                 uniqueUsers: { $addToSet: "$email" },
-                totalQueries: { $sum: { $size: "$chat_history" } }
+                totalQueries: {
+                    $sum: {
+                        $cond: {
+                            if: { $isArray: "$chat_history" },
+                            then: { $size: "$chat_history" },
+                            else: 0
+                        }
+                    }
+                }
             }
         },
         {
             $project: {
                 date: "$_id",
                 uniqueUsers: { $size: "$uniqueUsers" },
-                totalQueries: "$totalQueries",
+                totalQueries: 1,
                 averageQueries: {
                     $cond: [
                         { $eq: [{ $size: "$uniqueUsers" }, 0] },
@@ -966,5 +978,233 @@ async function calculateFeatureInteractionsPerDay(startDate, endDate) {
                 return acc;
             }, {})
         }))
+    };
+}
+
+async function calculateUserRetentionMetrics(startDate, endDate) {
+    const pipeline = [
+        {
+            $match: {
+                signup_date: { $gte: new Date(startDate), $lte: new Date(endDate) },
+                role: 'user'
+            }
+        },
+        {
+            $lookup: {
+                from: "chat_logs_hippo",
+                let: { userEmail: "$email" },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: { $eq: ["$email", "$$userEmail"] },
+                            role: 'user'
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            firstActivity: { $min: "$created_at" },
+                            lastActivity: { $max: "$created_at" },
+                            totalDaysActive: {
+                                $addToSet: {
+                                    $dateToString: {
+                                        format: "%Y-%m-%d",
+                                        date: "$created_at",
+                                        timezone: "America/New_York"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                as: "activity"
+            }
+        },
+        {
+            $project: {
+                email: 1,
+                signup_date: 1,
+                firstActivity: { $arrayElemAt: ["$activity.firstActivity", 0] },
+                lastActivity: { $arrayElemAt: ["$activity.lastActivity", 0] },
+                totalDaysActive: {
+                    $cond: {
+                        if: { $gt: [{ $size: "$activity" }, 0] },
+                        then: {
+                            $size: {
+                                $ifNull: [
+                                    { $arrayElemAt: ["$activity.totalDaysActive", 0] },
+                                    []
+                                ]
+                            }
+                        },
+                        else: 0
+                    }
+                },
+                lifespan: {
+                    $cond: {
+                        if: {
+                            $and: [
+                                { $gt: [{ $size: "$activity" }, 0] },
+                                { $ne: [{ $arrayElemAt: ["$activity.firstActivity", 0] }, null] },
+                                { $ne: [{ $arrayElemAt: ["$activity.lastActivity", 0] }, null] }
+                            ]
+                        },
+                        then: {
+                            $divide: [
+                                {
+                                    $subtract: [
+                                        { $arrayElemAt: ["$activity.lastActivity", 0] },
+                                        { $arrayElemAt: ["$activity.firstActivity", 0] }
+                                    ]
+                                },
+                                1000 * 60 * 60 * 24 // Convert to days
+                            ]
+                        },
+                        else: 0
+                    }
+                },
+                daysToChurn: {
+                    $cond: {
+                        if: {
+                            $and: [
+                                { $gt: [{ $size: "$activity" }, 0] },
+                                { $ne: [{ $arrayElemAt: ["$activity.lastActivity", 0] }, null] }
+                            ]
+                        },
+                        then: {
+                            $divide: [
+                                {
+                                    $subtract: [
+                                        { $arrayElemAt: ["$activity.lastActivity", 0] },
+                                        "$signup_date"
+                                    ]
+                                },
+                                1000 * 60 * 60 * 24 // Convert to days
+                            ]
+                        },
+                        else: 0
+                    }
+                },
+                isChurned: {
+                    $cond: {
+                        if: { $gt: [{ $size: "$activity" }, 0] },
+                        then: {
+                            $lt: [
+                                { $arrayElemAt: ["$activity.lastActivity", 0] },
+                                { $subtract: [new Date(), 1000 * 60 * 60 * 24 * 30] }
+                            ]
+                        },
+                        else: true
+                    }
+                }
+            }
+        },
+        {
+            $facet: {
+                lifespanDistribution: [
+                    {
+                        $bucket: {
+                            groupBy: "$lifespan",
+                            boundaries: [0, 1, 7, 30, 90, 180, 365],
+                            default: "365+",
+                            output: {
+                                count: { $sum: 1 },
+                                users: {
+                                    $push: {
+                                        email: "$email",
+                                        signupDate: "$signup_date",
+                                        lastActive: "$lastActivity",
+                                        daysActive: "$totalDaysActive"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                daysToChurnDistribution: [
+                    {
+                        $match: { isChurned: true }
+                    },
+                    {
+                        $bucket: {
+                            groupBy: "$daysToChurn",
+                            boundaries: [0, 1, 7, 30, 60, 90],
+                            default: "30+",
+                            output: {
+                                count: { $sum: 1 },
+                                users: {
+                                    $push: {
+                                        email: "$email",
+                                        signupDate: "$signup_date",
+                                        lastActive: "$lastActivity",
+                                        daysActive: "$totalDaysActive"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                retentionCohorts: [
+                    {
+                        $group: {
+                            _id: {
+                                $dateToString: {
+                                    format: "%Y-%m",
+                                    date: "$signup_date",
+                                    timezone: "America/New_York"
+                                }
+                            },
+                            totalUsers: { $sum: 1 },
+                            activeUsers: {
+                                $sum: { $cond: [{ $eq: ["$isChurned", false] }, 1, 0] }
+                            },
+                            avgDaysActive: { $avg: "$totalDaysActive" }
+                        }
+                    },
+                    {
+                        $project: {
+                            cohort: "$_id",
+                            totalUsers: 1,
+                            activeUsers: 1,
+                            retentionRate: {
+                                $multiply: [
+                                    { $divide: ["$activeUsers", "$totalUsers"] },
+                                    100
+                                ]
+                            },
+                            avgDaysActive: { $round: ["$avgDaysActive", 1] }
+                        }
+                    },
+                    {
+                        $sort: { cohort: 1 }
+                    }
+                ],
+                summary: [
+                    {
+                        $group: {
+                            _id: null,
+                            totalUsers: { $sum: 1 },
+                            activeUsers: {
+                                $sum: { $cond: [{ $eq: ["$isChurned", false] }, 1, 0] }
+                            },
+                            avgLifespan: { $avg: "$lifespan" },
+                            avgDaysActive: { $avg: "$totalDaysActive" },
+                            medianDaysToChurn: { $avg: "$daysToChurn" }
+                        }
+                    }
+                ]
+            }
+        }
+    ];
+
+    const result = await User.aggregate(pipeline);
+    return {
+        kpi: 'User Retention Metrics',
+        data: {
+            lifespanDistribution: result[0].lifespanDistribution,
+            daysToChurnDistribution: result[0].daysToChurnDistribution,
+            retentionCohorts: result[0].retentionCohorts,
+            summary: result[0].summary[0]
+        }
     };
 }
