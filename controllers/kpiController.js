@@ -3,6 +3,7 @@ const FeatureInteraction = require('../models/FeatureInteraction');
 const UserFeedback = require('../models/UserFeedback');
 const User = require('../models/userModel');
 const moment = require('moment-timezone');
+const Stripe = require("stripe");
 
 // Helper function to convert dates to EST
 const toEST = (date) => moment(date).tz('America/New_York').format();
@@ -59,6 +60,9 @@ exports.index = async (req, res) => {
                 break;
             case 'userRetentionMetrics':
                 result = await calculateUserRetentionMetrics(estStartDate, estEndDate);
+                break;
+            case 'stripeMetrics':
+                result = await calculateStripeMetrics(estStartDate, estEndDate);
                 break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
@@ -1208,3 +1212,95 @@ async function calculateUserRetentionMetrics(startDate, endDate) {
         }
     };
 }
+
+async function calculateStripeMetrics(startDate, endDate) {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    try {
+        // Get all customers using auto-pagination
+        let allCustomers = [];
+        for await (const customer of stripe.customers.list({
+            created: {
+                gte: Math.floor(new Date(startDate).getTime() / 1000),
+                lte: Math.floor(new Date(endDate).getTime() / 1000)
+            }
+        })) {
+            allCustomers.push(customer);
+        }
+        console.log('number of customers', allCustomers.length);
+
+        // Get all subscriptions using auto-pagination
+        let allSubscriptions = [];
+        for await (const subscription of stripe.subscriptions.list({
+            created: {
+                gte: Math.floor(new Date(startDate).getTime() / 1000),
+                lte: Math.floor(new Date(endDate).getTime() / 1000)
+            },
+            expand: ['data.customer']
+        })) {
+            allSubscriptions.push(subscription);
+        }
+
+        // Initialize metrics
+        const metrics = {
+            totalCustomers: allCustomers.length,
+            proSubscriptions: {
+                active: 0,
+                trial: 0,
+                cancelled: 0
+            },
+            basicSubscriptions: {
+                active: 0,
+                trial: 0,
+                cancelled: 0
+            },
+            noSubscription: 0,
+            conversionRate: 0
+        };
+
+        // Process subscriptions
+        allSubscriptions.forEach(sub => {
+            const isPro = sub.items.data.some(item => 
+                item.price.product.includes('pro') || item.price.product.includes('Pro'));
+            
+            if (isPro) {
+                if (sub.status === 'active' && !sub.cancel_at) {
+                    metrics.proSubscriptions.active++;
+                } else if (sub.status === 'trialing') {
+                    metrics.proSubscriptions.trial++;
+                } else if (sub.status === 'canceled' || sub.cancel_at) {
+                    metrics.proSubscriptions.cancelled++;
+                }
+            } else {
+                if (sub.status === 'active' && !sub.cancel_at) {
+                    metrics.basicSubscriptions.active++;
+                } else if (sub.status === 'trialing') {
+                    metrics.basicSubscriptions.trial++;
+                } else if (sub.status === 'canceled' || sub.cancel_at) {
+                    metrics.basicSubscriptions.cancelled++;
+                }
+            }
+        });
+
+        // Calculate customers without subscriptions
+        metrics.noSubscription = metrics.totalCustomers - 
+            (metrics.proSubscriptions.active + metrics.proSubscriptions.trial +
+             metrics.basicSubscriptions.active + metrics.basicSubscriptions.trial);
+
+        // Calculate conversion rates
+        const totalPaidSubscriptions = metrics.proSubscriptions.active + metrics.basicSubscriptions.active;
+        metrics.conversionRate = (totalPaidSubscriptions / metrics.totalCustomers) * 100;
+
+        // Calculate trial conversion rate
+        const totalTrialEnded = metrics.proSubscriptions.cancelled + metrics.basicSubscriptions.cancelled;
+        const totalConverted = metrics.proSubscriptions.active + metrics.basicSubscriptions.active;
+        metrics.trialConversionRate = totalTrialEnded > 0 ? 
+            (totalConverted / (totalTrialEnded + totalConverted)) * 100 : 0;
+
+        return { kpi: 'Stripe Metrics', data: metrics };
+    } catch (error) {
+        console.error('Error calculating Stripe metrics:', error);
+        throw error;
+    }
+}
+
