@@ -3,9 +3,12 @@ const { EC2Client, StartInstancesCommand, StopInstancesCommand, DescribeInstance
 const express = require('express');
 const { Client } = require('ssh2');
 const router = express.Router();
+const dotenv = require('dotenv');
+dotenv.config();
 
 const ec2 = new EC2Client({
   credentials: {
+    region: 'us-east-1',
     accessKeyId: process.env.EC2_AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.EC2_AWS_SECRET_ACCESS_KEY,
   },

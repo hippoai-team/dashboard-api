@@ -1,11 +1,13 @@
 const axios = require('axios');
 const mongoose = require('mongoose');
 const Image = require('image-js').Image;
-
+const dotenv = require('dotenv');
+dotenv.config();
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const S3Mapping = require('../models/S3Mapping');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+
 const s3Client = new S3Client({
   region: 'us-east-1',
   credentials: {
@@ -31,6 +33,7 @@ const source_type_list = {
 
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'https://pendiumdev.com/pipeline';
 const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline-no-pdf'
+//const PIPELINE_API_URL = 'http://localhost:8000/pipeline'
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
     Bucket: bucketName,
