@@ -268,7 +268,8 @@ exports.store = async (req, res) => {
             source_id: id.toString(),
             title: sourceData.title,
             status: 'active',
-            source_url: fileLocation,
+            image_url: fileLocation,
+            source_url: sourceData.source_url,
             source_type: sourceData.source_type,
             processed: false,
             date_added: new Date()

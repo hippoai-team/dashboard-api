@@ -3,7 +3,8 @@ const ChatLog = require('../models/chatLog');
 const BetaUser = require('../models/BetaUser');
 const moment = require('moment');
 const Stripe = require("stripe");
-
+const dotenv = require('dotenv');
+dotenv.config();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 exports.index = async (req, res) => {
@@ -22,6 +23,10 @@ exports.index = async (req, res) => {
                 { status: regexSearch },
                 { name: regexSearch },
             ];
+        }
+
+        if (req.query.profession) {
+            query.profession = req.query.profession;
         }
 
         const totalUsers = await User.countDocuments(query);
