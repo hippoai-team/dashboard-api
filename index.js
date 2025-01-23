@@ -46,5 +46,5 @@ app.use('/api/kpi', kpiRoutes)
 
 app.use('/admin', authRoutes);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server is running in port ${PORT}`));

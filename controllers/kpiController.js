@@ -64,6 +64,9 @@ exports.index = async (req, res) => {
             case 'stripeMetrics':
                 result = await calculateStripeMetrics(estStartDate, estEndDate);
                 break;
+            case 'caseSubmissionAnalytics':
+                result = await calculateCaseSubmissionAnalytics(estStartDate, estEndDate);
+                break;
             default:
                 return res.status(400).json({ error: 'Invalid KPI specified' });
         }
@@ -1234,9 +1237,9 @@ async function calculateStripeMetrics(startDate, endDate) {
         for await (const subscription of stripe.subscriptions.list({
             created: {
                 gte: Math.floor(new Date(startDate).getTime() / 1000),
-                lte: Math.floor(new Date(endDate).getTime() / 1000)
-            },
-            expand: ['data.customer']
+                lte: Math.floor(new Date(endDate).getTime() / 1000),
+                expand: ['data.customer']
+            }
         })) {
             allSubscriptions.push(subscription);
         }
@@ -1302,5 +1305,197 @@ async function calculateStripeMetrics(startDate, endDate) {
         console.error('Error calculating Stripe metrics:', error);
         throw error;
     }
+}
+
+async function calculateCaseSubmissionAnalytics(startDate, endDate) {
+    // Pipeline for case submissions from feature_interactions collection
+    const submissionsPipeline = [
+        {
+            $match: {
+                timestamp: { 
+                    $gte: new Date(startDate), 
+                    $lte: new Date(endDate) 
+                },
+                'interaction.interaction': 'submitted_case'
+            }
+        },
+        {
+            $group: {
+                _id: { 
+                    date: { 
+                        $dateToString: { 
+                            format: "%Y-%m-%d", 
+                            date: "$timestamp",
+                            timezone: "America/New_York"
+                        }
+                    },
+                    user: "$email"
+                },
+                submissionCount: { $sum: 1 }
+            }
+        },
+        {
+            $group: {
+                _id: "$_id.date",
+                uniqueUsers: { $addToSet: "$_id.user" },
+                totalSubmissions: { $sum: "$submissionCount" }
+            }
+        },
+        {
+            $project: {
+                date: "$_id",
+                uniqueUsers: { $size: "$uniqueUsers" },
+                totalSubmissions: 1,
+                submissionsPerUser: {
+                    $cond: [
+                        { $eq: [{ $size: "$uniqueUsers" }, 0] },
+                        0,
+                        { $divide: ["$totalSubmissions", { $size: "$uniqueUsers" }] }
+                    ]
+                }
+            }
+        },
+        {
+            $sort: { date: 1 }
+        }
+    ];
+
+    // Pipeline for study analytics from users collection
+    const studyAnalyticsPipeline = [
+        {
+            $match: {
+                user_attempted_cases: { $exists: true, $ne: {} }
+            }
+        },
+        {
+            $project: {
+                email: 1,
+                totalCases: { $size: { $objectToArray: "$user_attempted_cases" } },
+                caseScores: {
+                    $map: {
+                        input: { $objectToArray: "$user_attempted_cases" },
+                        as: "case",
+                        in: "$$case.v.case_evaluation.score_percentage"
+                    }
+                },
+                topics: {
+                    $map: {
+                        input: { $objectToArray: "$user_attempted_cases" },
+                        as: "case",
+                        in: "$$case.v.topic"
+                    }
+                }
+            }
+        },
+        {
+            $unwind: "$topics"
+        },
+        {
+            $group: {
+                _id: "$email",
+                email: { $first: "$email" },
+                totalCases: { $first: "$totalCases" },
+                caseScores: { $first: "$caseScores" },
+                topics: { $addToSet: "$topics" }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                email: 1,
+                totalCases: 1,
+                averageScore: { $avg: "$caseScores" },
+                topics: 1
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalUsers: { $sum: 1 },
+                averageCasesPerUser: { $avg: "$totalCases" },
+                averageScore: { $avg: "$averageScore" },
+                userScores: {
+                    $push: {
+                        email: "$email",
+                        totalCases: "$totalCases",
+                        averageScore: "$averageScore",
+                        topics: "$topics"
+                    }
+                }
+            }
+        }
+    ];
+
+    const [submissionsResult, studyAnalytics] = await Promise.all([
+        FeatureInteraction.aggregate(submissionsPipeline),
+        User.aggregate(studyAnalyticsPipeline)
+    ]);
+
+    // Add daily submissions per user
+    const userDailySubmissions = await FeatureInteraction.aggregate([
+        {
+            $match: {
+                timestamp: { 
+                    $gte: new Date(startDate), 
+                    $lte: new Date(endDate) 
+                },
+                'interaction.interaction': 'submitted_case'
+            }
+        },
+        {
+            $group: {
+                _id: { 
+                    date: { 
+                        $dateToString: { 
+                            format: "%Y-%m-%d", 
+                            date: "$timestamp",
+                            timezone: "America/New_York"
+                        }
+                    },
+                    email: "$email"
+                },
+                submissions: {
+                    $push: {
+                        caseId: "$interaction.case_id",
+                        topic: "$interaction.case_topic",
+                        score: "$interaction.score_percentage"
+                    }
+                },
+                count: { $sum: 1 }
+            }
+        },
+        {
+            $sort: { "_id.date": 1 }
+        },
+        {
+            $group: {
+                _id: "$_id.email",
+                dailySubmissions: {
+                    $push: {
+                        date: "$_id.date",
+                        submissions: "$submissions",
+                        count: "$count"
+                    }
+                }
+            }
+        }
+    ]);
+
+    return { 
+        kpi: 'Case Submission Analytics', 
+        data: {
+            dailySubmissions: submissionsResult.sort((a, b) => new Date(a.date) - new Date(b.date)),
+            studyAnalytics: studyAnalytics[0] || {
+                totalUsers: 0,
+                averageCasesPerUser: 0,
+                averageScore: 0,
+                userScores: []
+            },
+            userDailySubmissions: userDailySubmissions.reduce((acc, curr) => {
+                acc[curr._id] = curr.dailySubmissions;
+                return acc;
+            }, {})
+        }
+    };
 }
 

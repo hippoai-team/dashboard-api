@@ -32,8 +32,8 @@ const source_type_list = {
 };
 
 //const PIPELINE_API_URL = process.env.PIPELINE_API_URL || 'https://pendiumdev.com/pipeline';
-const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline-no-pdf'
-//const PIPELINE_API_URL = 'http://localhost:8000/pipeline'
+//const PIPELINE_API_URL = 'https://pendiumdev.com/pipeline-no-pdf'
+const PIPELINE_API_URL = 'http://localhost:8000/pipeline'
 async function uploadFileToS3(fileBuffer, bucketName, key) {
   const params = {
     Bucket: bucketName,
