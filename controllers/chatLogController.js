@@ -1,6 +1,6 @@
 const ChatLog = require("../models/chatLog");
 const BetaUser = require("../models/BetaUser");
-const UserFeedback = require("../models/userFeedback");
+const UserFeedback = require("../models/UserFeedback");
 
 const moment = require('moment');
 
