@@ -1,5 +1,6 @@
 const ChatLog = require("../models/chatLog");
 const BetaUser = require("../models/BetaUser");
+const UserFeedback = require("../models/userFeedback");
 
 const moment = require('moment');
 
@@ -108,6 +109,63 @@ exports.index = async (req, res) => {
           query.email = userFilter; // Add the status filter to the query object
           }
 
+        // Add feedback filter
+        const hasFeedback = req.query.hasFeedback === 'true';
+        let chatLogIds = [];
+        
+        if (hasFeedback) {
+            const feedbacks = await UserFeedback.find({}).lean();
+            chatLogIds = feedbacks.map(f => f.thread_uuid);
+            query.thread_uuid = { $in: chatLogIds };
+        }
+
+        // Get feedback statistics
+        const feedbackStats = await UserFeedback.aggregate([
+            {
+                $group: {
+                    _id: '$isLiked',
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const feedbackBreakdown = {
+            positive: feedbackStats.find(stat => stat._id === true)?.count || 0,
+            negative: feedbackStats.find(stat => stat._id === false)?.count || 0
+        };
+
+        // Get feedback category breakdown
+        const feedbackCategories = await UserFeedback.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    inaccurateInformation: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.inaccurateInformation", true] }, 1, 0] }
+                    },
+                    inaccurateSources: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.inaccurateSources", true] }, 1, 0] }
+                    },
+                    notRelevant: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.notRelevant", true] }, 1, 0] }
+                    },
+                    hallucinations: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.hallucinations", true] }, 1, 0] }
+                    },
+                    outdated: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.outdated", true] }, 1, 0] }
+                    },
+                    tooLengthy: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.tooLengthy", true] }, 1, 0] }
+                    },
+                    formatting: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.formatting", true] }, 1, 0] }
+                    },
+                    missingSources: { 
+                        $sum: { $cond: [{ $eq: ["$feedback.missingSources", true] }, 1, 0] }
+                    }
+                }
+            }
+        ]);
 
     const totalUserRatingYes = await ChatLog.countDocuments({ user_rating: 'Yes', ...query });
     const totalUserRatingNo = await ChatLog.countDocuments({ user_rating: 'No', ...query });
@@ -154,7 +212,38 @@ exports.index = async (req, res) => {
         .limit(perPage)
         .sort({ created_at: -1 });
       
+    // Fetch feedback data for all chat logs
+    const feedbackPromises = chatLogs.flatMap(chatLog => 
+        chatLog.chat_history.map(async history => {
+            try {
+                const feedback = await UserFeedback.findOne({
+                    thread_uuid: chatLog.thread_uuid,
+                    uuid: history.uuid
+                }).lean();
+                return {
+                    thread_uuid: chatLog.thread_uuid,
+                    uuid: history.uuid,
+                    feedback
+                };
+            } catch (err) {
+                console.error('Error fetching feedback:', err);
+                return {
+                    thread_uuid: chatLog.thread_uuid,
+                    uuid: history.uuid,
+                    feedback: null
+                };
+            }
+        })
+    );
     
+    const feedbacks = await Promise.all(feedbackPromises);
+    const feedbackMap = feedbacks.reduce((acc, curr) => {
+        if (curr.feedback) {
+            acc[`${curr.thread_uuid}-${curr.uuid}`] = curr.feedback;
+        }
+        return acc;
+    }, {});
+      
     const users = await ChatLog.distinct("email", query);
 
     const totalChats = await ChatLog.countDocuments({ ...query, datetime: { $gte: new Date('2023-11-16') } });
@@ -179,7 +268,9 @@ exports.index = async (req, res) => {
         users,
         totalFeedback,
         numChatsWithClickedSources,
-
+        feedbackMap,
+        feedbackBreakdown,
+        feedbackCategories: feedbackCategories[0] || {}
     };
 
     res.json(data);
