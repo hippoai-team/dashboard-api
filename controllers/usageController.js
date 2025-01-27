@@ -190,7 +190,7 @@ const sendBillEmail = async (customer, billHtml, month) => {
 
     const mailOptions = {
         from: "Pendium Health - HippoAI <hello@pendiumhealth.ca>",
-        to: 'stacy@pendiumhealth.com',
+        to: customer.customer_email,
         subject: `Pendium Health - Usage Bill for ${monthString}`,
         html: billHtml
     };
