@@ -17,7 +17,20 @@ const apiCustomerSchema = new mongoose.Schema({
     },
     status: String,
     permissions: String,
-    rate_limit: String,
+    rate_limit: {
+        monthly_limit: {
+            type: Number,
+            default: 500
+        },
+        base_cost_month: {
+            type: Number,
+            default: 200
+        },
+        overage_charge_per_use: {
+            type: Number,
+            default: 0.10  // Default $0.10 per use over limit
+        }
+    }
 });
 
 
