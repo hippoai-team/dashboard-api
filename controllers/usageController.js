@@ -62,6 +62,11 @@ const generateBillHTML = (customer, usage, rateLimitUsage, month) => {
         }, {})
     }));
 
+    // Calculate tax and final total
+    const HST_RATE = 0.13; // Ontario HST rate (13%)
+    const taxAmount = rateLimitUsage.totalCost * HST_RATE;
+    const finalTotal = rateLimitUsage.totalCost + taxAmount;
+
     return `
         <!DOCTYPE html>
         <html>
@@ -73,6 +78,7 @@ const generateBillHTML = (customer, usage, rateLimitUsage, month) => {
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f4f4f4; }
                 .total { font-weight: bold; }
+                .grand-total { font-weight: bold; background-color: #f8f8f8; }
                 .header { margin-bottom: 30px; }
                 .footer { margin-top: 30px; font-size: 0.9em; color: #666; }
                 .section { margin-bottom: 30px; }
@@ -109,8 +115,16 @@ const generateBillHTML = (customer, usage, rateLimitUsage, month) => {
                             <td>$${rateLimitUsage.overageCost.toFixed(2)}</td>
                         </tr>` : ''}
                         <tr class="total">
-                            <td>Total</td>
+                            <td>Subtotal</td>
                             <td>$${rateLimitUsage.totalCost.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td>HST (13%)</td>
+                            <td>$${taxAmount.toFixed(2)}</td>
+                        </tr>
+                        <tr class="grand-total">
+                            <td>Total (including tax)</td>
+                            <td>$${finalTotal.toFixed(2)}</td>
                         </tr>
                     </table>
                 </div>
@@ -168,6 +182,7 @@ const generateBillHTML = (customer, usage, rateLimitUsage, month) => {
 
                 <div class="footer">
                     <p>Thank you for using Pendium Health's services. For any questions about this bill, please contact us at hello@pendiumhealth.com</p>
+                    <p>HST Registration Number: 123456789RT0001</p>
                 </div>
             </div>
         </body>
